@@ -24,7 +24,7 @@ import (
 	"github.com/shima-park/agollo"
 )
 
-// Client the wrapper of nacos client.
+// Client the wrapper of apollo client.
 type Client interface {
 	SetParser(ConfigParser)
 	ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
@@ -55,6 +55,8 @@ const (
 	RetryConfigName          = "retry"
 	RpcTimeoutConfigName     = "rpc_timeout"
 	CircuitBreakerConfigName = "circuit_break"
+
+	LimiterConfigName = "limit"
 )
 
 type Options struct {
@@ -66,6 +68,7 @@ type Options struct {
 	ClientKeyFormat string
 	IsPrivate       bool
 	AccessKey       string
+	BackupFilePath  string
 	CustomLogger    log.LoggerInterface
 	ConfigParser    ConfigParser
 }
@@ -98,7 +101,7 @@ func New(opts Options) (Client, error) {
 	}
 	agolloOption := []agollo.Option{
 		agollo.Cluster(opts.Cluster),
-		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName}...),
+		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName, LimiterConfigName}...),
 		agollo.AutoFetchOnCacheMiss(),
 	}
 	if opts.IsPrivate {
@@ -107,13 +110,9 @@ func New(opts Options) (Client, error) {
 		}
 		agolloOption = append(agolloOption, agollo.AccessKey(opts.AccessKey))
 	}
-	// 默认是properties格式的文件， 如果是json或者yml需要指定后缀，例如 namespace.json
-	// agollo.PreloadNamespaces("namespace"), // 预加载命名空间----配置文件名
-	// agollo.AccessKey("screct")} // 访问私有
-	// 默认是properties格式的文件， 如果是json或者yml需要指定后缀，例如 namespace.json
-	// agollo.PreloadNamespaces("namespace"...),// 预加载命名空间----配置文件名
-	// agollo.AccessKey("screct")}// 访问私有
-
+	if opts.BackupFilePath != "" {
+		agolloOption = append(agolloOption, agollo.BackupFile(opts.BackupFilePath))
+	}
 	apolloCli, err := agollo.New(opts.ConfigServerURL, opts.AppID, agolloOption...)
 	if err != nil {
 		return nil, err

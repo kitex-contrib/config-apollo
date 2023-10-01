@@ -24,6 +24,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
+	"github.com/kitex-contrib/config-apollo/apollo"
+	apolloserver "github.com/kitex-contrib/config-apollo/server"
 )
 
 var _ api.Echo = &EchoImpl{}
@@ -39,11 +41,17 @@ func (s *EchoImpl) Echo(ctx context.Context, req *api.Request) (resp *api.Respon
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-	// apolloClient, err := apollo.New(apollo.Options{})
-	// if err != nil {
-	// 	panic(err)
-	// }
-	serviceName := "temp"
+	apolloClient, err := apollo.New(apollo.Options{})
+	if err != nil {
+		panic(err)
+	}
+	fn := func(cp *apollo.ConfigParam) {
+		klog.Infof("apollo config %v", cp)
+		klog.Infof("apollo namespace: %v", cp.NameSpace)
+		klog.Infof("apollo key: %v", cp.Key)
+		klog.Infof("apollo cluster: %v", cp.Cluster)
+	}
+	serviceName := "echo"
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)
@@ -51,6 +59,7 @@ func main() {
 	svr := echo.NewServer(
 		new(EchoImpl),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
+		server.WithSuite(apolloserver.NewSuite(serviceName, apolloClient, fn)),
 		server.WithServiceAddr(addr),
 	)
 	if err := svr.Run(); err != nil {
