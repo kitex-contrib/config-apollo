@@ -45,7 +45,6 @@ func main() {
 	// }
 	serviceName := "temp"
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
-
 	if err != nil {
 		panic(err)
 	}

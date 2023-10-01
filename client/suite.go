@@ -36,6 +36,7 @@ func NewSuite(service, client string, cli apollo.Client,
 		fns:          cfs,
 	}
 }
+
 func (s *ApolloClientSuite) Options() []client.Option {
 	opts := make([]client.Option, 0, 7)
 	opts = append(opts, WithRetryPolicy(s.service, s.client, s.apolloClient, s.fns...)...)

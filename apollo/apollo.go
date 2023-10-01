@@ -159,6 +159,7 @@ func (c *client) render(cpc *ConfigParamConfig, t *template.Template) (string, e
 	}
 	return tpl.String(), nil
 }
+
 func (c *client) ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error) {
 	return c.configParam(cpc, c.serverKeyTemplate, cfs...)
 }
@@ -229,9 +230,7 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 	go c.listenConfig(param, onChange)
 }
 
-func (c *client) listenConfig(param ConfigParam,
-	callback func(namespace, cluster, key, data string)) {
-
+func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluster, key, data string)) {
 	errorsCh := c.acli.Start()
 	apolloRespCh := c.acli.WatchNamespace(param.NameSpace, make(chan bool))
 
