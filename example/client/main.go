@@ -31,9 +31,7 @@ import (
 func main() {
 	klog.SetLevel(klog.LevelDebug)
 
-	apolloClient, err := apollo.New(apollo.Options{
-		AppID: "SampleApp",
-	})
+	apolloClient, err := apollo.New(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}

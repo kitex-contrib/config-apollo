@@ -25,7 +25,7 @@ func NewSuite(service, client string, cli apollo.Client,
 func (s *ApolloClientSuite) Options() []client.Option {
 	opts := make([]client.Option, 0, 7)
 	opts = append(opts, WithRetryPolicy(s.service, s.client, s.apolloClient, s.fns...)...)
-	// opts = append(opts, WithRPCTimeout(s.service, s.client, s.nacosClient, s.fns...)...)
-	// opts = append(opts, WithCircuitBreaker(s.service, s.client, s.nacosClient, s.fns...)...)
+	opts = append(opts, WithRPCTimeout(s.service, s.client, s.apolloClient, s.fns...)...)
+	opts = append(opts, WithCircuitBreaker(s.service, s.client, s.apolloClient, s.fns...)...)
 	return opts
 }

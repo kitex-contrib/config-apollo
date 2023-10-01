@@ -15,7 +15,7 @@ const (
 	JSON                         ConfigType = "json"
 	YAML                         ConfigType = "yaml"
 	ApolloDefaultConfigServerURL            = "127.0.0.1:8080"
-	ApolloDefaultAppId                      = "KitexApplication"
+	ApolloDefaultAppId                      = "KitexApp"
 	ApolloDefaultCluster                    = "default"
 	ApolloNameSpace                         = "{{.Category}}"
 	ApolloDefaultClientKey                  = "{{.ClientServiceName}}.{{.ServerServiceName}}"
