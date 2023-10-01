@@ -1,9 +1,8 @@
 package apollo
 
 import (
+	"encoding/json"
 	"fmt"
-
-	"gopkg.in/yaml.v2"
 )
 
 // CustomFunction use for customize the config parameters.
@@ -17,7 +16,7 @@ const (
 	YAML                         ConfigType = "yaml"
 	ApolloDefaultConfigServerURL            = "127.0.0.1:8080"
 	ApolloDefaultAppId                      = "KitexApplication"
-	ApolloDefaultCluster                    = "DEFAULT_CLUSTER"
+	ApolloDefaultCluster                    = "default"
 	ApolloNameSpace                         = "{{.Category}}"
 	ApolloDefaultClientKey                  = "{{.ClientServiceName}}.{{.ServerServiceName}}"
 	ApolloDefaultServerKey                  = "{{.ServerServiceName}}"
@@ -33,7 +32,6 @@ type ConfigParamConfig struct {
 	Category          string
 	ClientServiceName string
 	ServerServiceName string
-	Key               string
 }
 
 var _ ConfigParser = &parser{}
@@ -50,7 +48,7 @@ func (p *parser) Decode(kind ConfigType, data string, config interface{}) error 
 	switch kind {
 	case JSON, YAML:
 		// since YAML is a superset of JSON, it can parse JSON using a YAML parser
-		return yaml.Unmarshal([]byte(data), config)
+		return json.Unmarshal([]byte(data), config)
 	default:
 		return fmt.Errorf("unsupported config data type %s", kind)
 	}

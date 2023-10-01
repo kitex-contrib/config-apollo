@@ -29,8 +29,8 @@ type Client interface {
 	SetParser(ConfigParser)
 	ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
 	ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
-	// RegisterConfigCallback(ConfigParam, func(string, ConfigParser))
-	DeregisterConfig(ConfigParam)
+	RegisterConfigCallback(ConfigParam, func(string, ConfigParser))
+	DeregisterConfig(ConfigParam) error
 }
 
 type ConfigParam struct {
@@ -51,6 +51,12 @@ type client struct {
 	clientKeyTemplate *template.Template
 }
 
+const (
+	RetryConfigName          = "retry"
+	RpcTimeoutConfigName     = "rpc_timeout"
+	CircuitBreakerConfigName = "circuit_break"
+)
+
 type Options struct {
 	ConfigServerURL string
 	NamespaceID     string
@@ -58,6 +64,8 @@ type Options struct {
 	Cluster         string
 	ServerKeyFormat string
 	ClientKeyFormat string
+	IsPrivate       bool
+	AccessKey       string
 	CustomLogger    log.LoggerInterface
 	ConfigParser    ConfigParser
 }
@@ -75,6 +83,10 @@ func New(opts Options) (Client, error) {
 	if opts.AppID == "" {
 		opts.AppID = ApolloDefaultAppId
 	}
+	// TODO
+	if opts.NamespaceID == "" {
+		opts.NamespaceID = ApolloNameSpace
+	}
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
 	}
@@ -85,10 +97,19 @@ func New(opts Options) (Client, error) {
 		opts.ClientKeyFormat = ApolloDefaultClientKey
 	}
 	agolloOption := []agollo.Option{
-		agollo.Cluster("cluster"),
-		// 默认是properties格式的文件， 如果是json或者yml需要指定后缀，例如 namespace.json
-		// agollo.PreloadNamespaces("namespace"), // 预加载命名空间----配置文件名
-		agollo.AccessKey("screct")} // 访问私有
+		agollo.Cluster(opts.Cluster),
+		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName}...),
+		agollo.AutoFetchOnCacheMiss(),
+	}
+	if opts.IsPrivate {
+		if opts.AccessKey == "" {
+			return nil, errors.New("[apollo] need accesskey for private namespace")
+		}
+		agolloOption = append(agolloOption, agollo.AccessKey(opts.AccessKey))
+	}
+	// 默认是properties格式的文件， 如果是json或者yml需要指定后缀，例如 namespace.json
+	// agollo.PreloadNamespaces("namespace"), // 预加载命名空间----配置文件名
+	// agollo.AccessKey("screct")} // 访问私有
 	// 默认是properties格式的文件， 如果是json或者yml需要指定后缀，例如 namespace.json
 	// agollo.PreloadNamespaces("namespace"...),// 预加载命名空间----配置文件名
 	// agollo.AccessKey("screct")}// 访问私有
@@ -97,6 +118,7 @@ func New(opts Options) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO
 	clusterTemplate, err := template.New("cluster").Parse(opts.Cluster)
 	if err != nil {
 		return nil, err
@@ -179,8 +201,9 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs .
 }
 
 // DeregisterConfig deregister the config.
-func (c *client) DeregisterConfig(cfg ConfigParam) {
+func (c *client) DeregisterConfig(cfg ConfigParam) error {
 	c.acli.Stop()
+	return nil
 }
 
 // RegisterConfigCallback register the callback function to apollo client.
@@ -196,8 +219,11 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 	configMap := c.acli.GetNameSpace(param.NameSpace)
 	data, ok := configMap[param.Key]
 	if !ok {
+		klog.Info("key:", param.Key)
+		klog.Info("CONFIG:", configMap)
 		panic(errors.New("kitex config : key not found"))
 	}
+	// data := c.acli.Get(param.Key, agollo.WithNamespace(param.NameSpace))
 	callback(data.(string), c.parser)
 
 	go c.listenConfig(param, onChange)
@@ -219,6 +245,7 @@ func (c *client) listenConfig(param ConfigParam,
 				klog.Error("[apollo] please recover key remote config")
 				continue
 			}
+			klog.Info("[apollo] config update")
 			callback(param.NameSpace, param.Cluster, param.Key, data.(string))
 		case err := <-errorsCh:
 			klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error %s",
