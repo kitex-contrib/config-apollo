@@ -46,7 +46,6 @@ type client struct {
 	// support customise parser
 	parser            ConfigParser
 	clusterTemplate   *template.Template
-	namespaceTemplate *template.Template
 	serverKeyTemplate *template.Template
 	clientKeyTemplate *template.Template
 }
@@ -103,6 +102,7 @@ func New(opts Options) (Client, error) {
 		agollo.Cluster(opts.Cluster),
 		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName, LimiterConfigName}...),
 		agollo.AutoFetchOnCacheMiss(),
+		agollo.FailTolerantOnBackupExists(),
 	}
 	if opts.IsPrivate {
 		if opts.AccessKey == "" {
@@ -122,10 +122,7 @@ func New(opts Options) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	namespaceTemplate, err := template.New("namespace").Parse(opts.NamespaceID)
-	if err != nil {
-		return nil, err
-	}
+
 	serverKeyTemplate, err := template.New("serverKey").Parse(opts.ServerKeyFormat)
 	if err != nil {
 		return nil, err
@@ -138,7 +135,6 @@ func New(opts Options) (Client, error) {
 		acli:              apolloCli,
 		parser:            opts.ConfigParser,
 		clusterTemplate:   clusterTemplate,
-		namespaceTemplate: namespaceTemplate,
 		serverKeyTemplate: serverKeyTemplate,
 		clientKeyTemplate: clientKeyTemplate,
 	}
@@ -178,15 +174,12 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction
 //  5. Cluster: DEFAULT_CLUSTER by default
 func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs ...CustomFunction) (ConfigParam, error) {
 	param := ConfigParam{
-		Type:    JSON,
-		Content: defaultContent,
+		Type:      JSON,
+		Content:   defaultContent,
+		NameSpace: cpc.Category,
 	}
 	var err error
 	param.Key, err = c.render(cpc, t)
-	if err != nil {
-		return param, err
-	}
-	param.NameSpace, err = c.render(cpc, c.namespaceTemplate)
 	if err != nil {
 		return param, err
 	}
