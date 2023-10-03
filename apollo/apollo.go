@@ -72,7 +72,7 @@ type Options struct {
 	ConfigParser    ConfigParser
 }
 
-func New(opts Options) (Client, error) {
+func NewOptions(opts Options) (Client, error) {
 	if opts.ConfigServerURL == "" {
 		opts.ConfigServerURL = ApolloDefaultConfigServerURL
 	}
@@ -85,7 +85,6 @@ func New(opts Options) (Client, error) {
 	if opts.AppID == "" {
 		opts.AppID = ApolloDefaultAppId
 	}
-	// TODO
 	if opts.NamespaceID == "" {
 		opts.NamespaceID = ApolloNameSpace
 	}
@@ -117,12 +116,10 @@ func New(opts Options) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO
 	clusterTemplate, err := template.New("cluster").Parse(opts.Cluster)
 	if err != nil {
 		return nil, err
 	}
-
 	serverKeyTemplate, err := template.New("serverKey").Parse(opts.ServerKeyFormat)
 	if err != nil {
 		return nil, err
@@ -168,7 +165,7 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction
 // ConfigParam explain:
 //  1. Type: key format, support JSON and YAML, JSON by default. Could extend it by implementing the ConfigParser interface.
 //  2. Content: empty by default. Customize with CustomFunction.
-//  3. NameSpace: {{.Category}} by default.
+//  3. NameSpace: select by user.
 //  4. ServerKey: {{.ServerServiceName}} by default.
 //     ClientKey: {{.ClientServiceName}}.{{.ServerServiceName}} by default.
 //  5. Cluster: DEFAULT_CLUSTER by default
