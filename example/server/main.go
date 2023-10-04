@@ -43,7 +43,7 @@ func (s *EchoImpl) Echo(ctx context.Context, req *api.Request) (resp *api.Respon
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-	apolloClient, err := apollo.NewOptions(apollo.Options{})
+	apolloClient, err := apollo.NewClient(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}

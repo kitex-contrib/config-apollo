@@ -72,7 +72,7 @@ type Options struct {
 	ConfigParser    ConfigParser
 }
 
-func NewOptions(opts Options) (Client, error) {
+func NewClient(opts Options) (Client, error) {
 	if opts.ConfigServerURL == "" {
 		opts.ConfigServerURL = ApolloDefaultConfigServerURL
 	}
@@ -168,7 +168,7 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction
 //  3. NameSpace: select by user.
 //  4. ServerKey: {{.ServerServiceName}} by default.
 //     ClientKey: {{.ClientServiceName}}.{{.ServerServiceName}} by default.
-//  5. Cluster: DEFAULT_CLUSTER by default
+//  5. Cluster: default by default
 func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs ...CustomFunction) (ConfigParam, error) {
 	param := ConfigParam{
 		Type:      JSON,
@@ -220,6 +220,11 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 }
 
 func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluster, key, data string)) {
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Error("[apollo] listen goroutine error:", err)
+		}
+	}()
 	errorsCh := c.acli.Start()
 	apolloRespCh := c.acli.WatchNamespace(param.NameSpace, make(chan bool))
 
@@ -230,7 +235,8 @@ func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluste
 			if !ok {
 				klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found",
 					param.NameSpace, param.NameSpace, param.Cluster, param.Key)
-				klog.Error("[apollo] please recover key remote config")
+				klog.Error("[apollo] please recover key from remote config")
+				callback(param.NameSpace, param.Cluster, param.Key, "")
 				continue
 			}
 			klog.Info("[apollo] config update")

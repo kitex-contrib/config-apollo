@@ -15,8 +15,9 @@
 package apollo
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/bytedance/sonic"
 )
 
 // CustomFunction use for customize the config parameters.
@@ -61,8 +62,7 @@ type parser struct{}
 func (p *parser) Decode(kind ConfigType, data string, config interface{}) error {
 	switch kind {
 	case JSON, YAML:
-		// since YAML is a superset of JSON, it can parse JSON using a YAML parser
-		return json.Unmarshal([]byte(data), config)
+		return sonic.Unmarshal([]byte(data), config)
 	default:
 		return fmt.Errorf("unsupported config data type %s", kind)
 	}

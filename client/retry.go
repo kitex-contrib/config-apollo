@@ -33,9 +33,10 @@ func WithRetryPolicy(dest, src string, apolloClient apollo.Client,
 	if err != nil {
 		panic(err)
 	}
-
+	rc := initRetryContainer(param, dest, apolloClient)
 	return []client.Option{
-		client.WithRetryContainer(initRetryContainer(param, dest, apolloClient)),
+		client.WithRetryContainer(rc),
+		client.WithCloseCallbacks(rc.Close),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
 			return apolloClient.DeregisterConfig(param)
@@ -46,7 +47,7 @@ func WithRetryPolicy(dest, src string, apolloClient apollo.Client,
 func initRetryContainer(param apollo.ConfigParam, dest string,
 	apolloClient apollo.Client,
 ) *retry.Container {
-	retryContainer := retry.NewRetryContainer()
+	retryContainer := retry.NewRetryContainerWithPercentageLimit()
 
 	ts := utils.ThreadSafeSet{}
 
