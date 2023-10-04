@@ -211,10 +211,10 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 	if !ok {
 		klog.Info("key:", param.Key)
 		klog.Info("CONFIG:", configMap)
-		panic(errors.New("kitex config : key not found"))
+		klog.Debug("[apollo] key not found")
+	} else {
+		callback(data.(string), c.parser)
 	}
-	// data := c.acli.Get(param.Key, agollo.WithNamespace(param.NameSpace))
-	callback(data.(string), c.parser)
 
 	go c.listenConfig(param, onChange)
 }

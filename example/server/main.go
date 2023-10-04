@@ -19,6 +19,8 @@ import (
 	"log"
 	"net"
 
+	//"github.com/cloudwego/kitex-examples/kitex_gen/api"
+	//"github.com/cloudwego/kitex-examples/kitex_gen/api/echo"
 	"github.com/cloudwego/kitex-examples/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/kitex_gen/api/echo"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -51,7 +53,7 @@ func main() {
 		klog.Infof("apollo key: %v", cp.Key)
 		klog.Infof("apollo cluster: %v", cp.Cluster)
 	}
-	serviceName := "echo"
+	serviceName := "ServiceName"
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)

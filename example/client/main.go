@@ -43,8 +43,8 @@ func main() {
 		klog.Infof("apollo cluster: %v", cp.Cluster)
 	}
 
-	serviceName := "temp"
-	clientName := "echo"
+	serviceName := "ServiceName"
+	clientName := "ClientName"
 	client, err := echo.NewClient(
 		serviceName,
 		client.WithHostPorts("0.0.0.0:8899"),
