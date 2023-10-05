@@ -53,11 +53,13 @@ func WithApolloClient(cli apollo.Client) ServerSuiteOption {
 		s.apolloClient = cli
 	}
 }
+
 func WithService(service string) ServerSuiteOption {
 	return func(s *ApolloServerSuite) {
 		s.service = service
 	}
 }
+
 func WithCustomParamFunc(cfs ...apollo.CustomFunction) ServerSuiteOption {
 	return func(s *ApolloServerSuite) {
 		s.fns = append(s.fns, cfs...)
