@@ -26,15 +26,19 @@ type ApolloServerSuite struct {
 	fns          []apollo.CustomFunction
 }
 
+type ServerSuiteOption func(*ApolloServerSuite)
+
 // NewSuite service is the destination service.
-func NewSuite(service string, cli apollo.Client,
-	cfs ...apollo.CustomFunction,
+func NewSuite(service string, cli apollo.Client, options ...ServerSuiteOption,
 ) *ApolloServerSuite {
-	return &ApolloServerSuite{
+	server_suite := &ApolloServerSuite{
 		service:      service,
 		apolloClient: cli,
-		fns:          cfs,
 	}
+	for _, option := range options {
+		option(server_suite)
+	}
+	return server_suite
 }
 
 // Options return a list client.Option
@@ -42,4 +46,20 @@ func (s *ApolloServerSuite) Options() []server.Option {
 	opts := make([]server.Option, 0, 2)
 	opts = append(opts, WithLimiter(s.service, s.apolloClient, s.fns...))
 	return opts
+}
+
+func WithApolloClient(cli apollo.Client) ServerSuiteOption {
+	return func(s *ApolloServerSuite) {
+		s.apolloClient = cli
+	}
+}
+func WithService(service string) ServerSuiteOption {
+	return func(s *ApolloServerSuite) {
+		s.service = service
+	}
+}
+func WithCustomParamFunc(cfs ...apollo.CustomFunction) ServerSuiteOption {
+	return func(s *ApolloServerSuite) {
+		s.fns = append(s.fns, cfs...)
+	}
 }

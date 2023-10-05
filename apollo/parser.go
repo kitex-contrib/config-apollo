@@ -24,6 +24,7 @@ import (
 type (
 	CustomFunction func(*ConfigParam)
 	ConfigType     string
+	ConfigContent  string
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 )
 
 const (
-	defaultContent = ""
+	emptyConfig string = "{}"
 )
 
 // ConfigParamConfig use for render the dataId or group info by go template, ref: https://pkg.go.dev/text/template
@@ -61,7 +62,7 @@ type parser struct{}
 // Decode decodes the data to struct in specified format.
 func (p *parser) Decode(kind ConfigType, data string, config interface{}) error {
 	switch kind {
-	case JSON, YAML:
+	case JSON:
 		return sonic.Unmarshal([]byte(data), config)
 	default:
 		return fmt.Errorf("unsupported config data type %s", kind)

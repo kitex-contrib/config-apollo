@@ -26,15 +26,20 @@ type ApolloClientSuite struct {
 	fns          []apollo.CustomFunction
 }
 
+type ClientSuiteOption func(*ApolloClientSuite)
+
 func NewSuite(service, client string, cli apollo.Client,
-	cfs ...apollo.CustomFunction,
+	options ...ClientSuiteOption,
 ) *ApolloClientSuite {
-	return &ApolloClientSuite{
+	client_suite := &ApolloClientSuite{
 		service:      service,
 		client:       client,
 		apolloClient: cli,
-		fns:          cfs,
 	}
+	for _, option := range options {
+		option(client_suite)
+	}
+	return client_suite
 }
 
 func (s *ApolloClientSuite) Options() []client.Option {
@@ -43,4 +48,25 @@ func (s *ApolloClientSuite) Options() []client.Option {
 	opts = append(opts, WithRPCTimeout(s.service, s.client, s.apolloClient, s.fns...)...)
 	opts = append(opts, WithCircuitBreaker(s.service, s.client, s.apolloClient, s.fns...)...)
 	return opts
+}
+
+func WithApolloClient(cli apollo.Client) ClientSuiteOption {
+	return func(s *ApolloClientSuite) {
+		s.apolloClient = cli
+	}
+}
+func WithClientName(client string) ClientSuiteOption {
+	return func(s *ApolloClientSuite) {
+		s.client = client
+	}
+}
+func WithServiceName(service string) ClientSuiteOption {
+	return func(s *ApolloClientSuite) {
+		s.service = service
+	}
+}
+func WithConfigParamFunc(fns ...apollo.CustomFunction) ClientSuiteOption {
+	return func(s *ApolloClientSuite) {
+		s.fns = append(s.fns, fns...)
+	}
 }

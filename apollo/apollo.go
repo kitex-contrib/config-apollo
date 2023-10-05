@@ -16,7 +16,6 @@ package apollo
 
 import (
 	"bytes"
-	"errors"
 	"text/template"
 
 	"github.com/apolloconfig/agollo/v4/component/log"
@@ -35,9 +34,8 @@ type Client interface {
 
 type ConfigParam struct {
 	Key       string
-	NameSpace string
+	nameSpace string
 	Cluster   string
-	Content   string
 	Type      ConfigType
 }
 
@@ -65,14 +63,14 @@ type Options struct {
 	Cluster         string
 	ServerKeyFormat string
 	ClientKeyFormat string
-	IsPrivate       bool
-	AccessKey       string
-	BackupFilePath  string
+	ApolloOptions   []agollo.Option
 	CustomLogger    log.LoggerInterface
 	ConfigParser    ConfigParser
 }
 
-func NewClient(opts Options) (Client, error) {
+type OptionFunc func(option *Options)
+
+func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	if opts.ConfigServerURL == "" {
 		opts.ConfigServerURL = ApolloDefaultConfigServerURL
 	}
@@ -90,6 +88,7 @@ func NewClient(opts Options) (Client, error) {
 	}
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
+		opts.ApolloOptions = append(opts.ApolloOptions, agollo.Cluster(opts.Cluster))
 	}
 	if opts.ServerKeyFormat == "" {
 		opts.ServerKeyFormat = ApolloDefaultServerKey
@@ -97,22 +96,14 @@ func NewClient(opts Options) (Client, error) {
 	if opts.ClientKeyFormat == "" {
 		opts.ClientKeyFormat = ApolloDefaultClientKey
 	}
-	agolloOption := []agollo.Option{
-		agollo.Cluster(opts.Cluster),
-		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName, LimiterConfigName}...),
+	opts.ApolloOptions = append(opts.ApolloOptions,
 		agollo.AutoFetchOnCacheMiss(),
 		agollo.FailTolerantOnBackupExists(),
+	)
+	for _, option := range optsfunc {
+		option(&opts)
 	}
-	if opts.IsPrivate {
-		if opts.AccessKey == "" {
-			return nil, errors.New("[apollo] need accesskey for private namespace")
-		}
-		agolloOption = append(agolloOption, agollo.AccessKey(opts.AccessKey))
-	}
-	if opts.BackupFilePath != "" {
-		agolloOption = append(agolloOption, agollo.BackupFile(opts.BackupFilePath))
-	}
-	apolloCli, err := agollo.New(opts.ConfigServerURL, opts.AppID, agolloOption...)
+	apolloCli, err := agollo.New(opts.ConfigServerURL, opts.AppID, opts.ApolloOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +128,12 @@ func NewClient(opts Options) (Client, error) {
 	}
 
 	return cli, nil
+}
+
+func WithApolloOption(apolloOption ...agollo.Option) OptionFunc {
+	return func(option *Options) {
+		option.ApolloOptions = append(option.ApolloOptions, apolloOption...)
+	}
 }
 
 func (c *client) SetParser(parser ConfigParser) {
@@ -172,8 +169,7 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction
 func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs ...CustomFunction) (ConfigParam, error) {
 	param := ConfigParam{
 		Type:      JSON,
-		Content:   defaultContent,
-		NameSpace: cpc.Category,
+		nameSpace: cpc.Category,
 	}
 	var err error
 	param.Key, err = c.render(cpc, t)
@@ -206,7 +202,7 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 		callback(data, c.parser)
 	}
 
-	configMap := c.acli.GetNameSpace(param.NameSpace)
+	configMap := c.acli.GetNameSpace(param.nameSpace)
 	data, ok := configMap[param.Key]
 	if !ok {
 		klog.Info("key:", param.Key)
@@ -226,24 +222,25 @@ func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluste
 		}
 	}()
 	errorsCh := c.acli.Start()
-	apolloRespCh := c.acli.WatchNamespace(param.NameSpace, make(chan bool))
+	apolloRespCh := c.acli.WatchNamespace(param.nameSpace, make(chan bool))
 
 	for {
 		select {
 		case resp := <-apolloRespCh:
+			klog.Info("[apollo] config update")
 			data, ok := resp.NewValue[param.Key]
 			if !ok {
+				// Deal with delete config
 				klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found",
-					param.NameSpace, param.NameSpace, param.Cluster, param.Key)
+					param.nameSpace, param.nameSpace, param.Cluster, param.Key)
 				klog.Error("[apollo] please recover key from remote config")
-				callback(param.NameSpace, param.Cluster, param.Key, "")
+				callback(param.nameSpace, param.Cluster, param.Key, emptyConfig)
 				continue
 			}
-			klog.Info("[apollo] config update")
-			callback(param.NameSpace, param.Cluster, param.Key, data.(string))
+			callback(param.nameSpace, param.Cluster, param.Key, data.(string))
 		case err := <-errorsCh:
 			klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error %s",
-				param.NameSpace, param.NameSpace, param.Cluster, param.Key, err.Err.Error())
+				param.nameSpace, param.nameSpace, param.Cluster, param.Key, err.Err.Error())
 			return
 		}
 	}
