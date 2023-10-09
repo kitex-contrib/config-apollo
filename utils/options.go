@@ -21,7 +21,7 @@ type Option interface {
 	Apply(*Options)
 }
 
-// Options is used to initialize the nacos config suit or option.
+// Options is used to initialize the apollo config suit or option.
 type Options struct {
 	ApolloCustomFunctions []apollo.CustomFunction
 }
