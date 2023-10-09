@@ -26,8 +26,8 @@ import (
 // Client the wrapper of apollo client.
 type Client interface {
 	SetParser(ConfigParser)
-	ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
-	ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
+	ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
+	ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
 	RegisterConfigCallback(ConfigParam, func(string, ConfigParser))
 	DeregisterConfig(ConfigParam) error
 }
@@ -58,7 +58,7 @@ const (
 
 type Options struct {
 	ConfigServerURL string
-	NamespaceID     string
+	namespaceID     string
 	AppID           string
 	Cluster         string
 	ServerKeyFormat string
@@ -83,9 +83,7 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	if opts.AppID == "" {
 		opts.AppID = ApolloDefaultAppId
 	}
-	if opts.NamespaceID == "" {
-		opts.NamespaceID = ApolloNameSpace
-	}
+	opts.namespaceID = ApolloNameSpace
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
 		opts.ApolloOptions = append(opts.ApolloOptions, agollo.Cluster(opts.Cluster))
@@ -149,13 +147,13 @@ func (c *client) render(cpc *ConfigParamConfig, t *template.Template) (string, e
 	return tpl.String(), nil
 }
 
-func (c *client) ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error) {
-	return c.configParam(cpc, c.serverKeyTemplate, cfs...)
+func (c *client) ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error) {
+	return c.configParam(cpc, c.serverKeyTemplate)
 }
 
 // ClientConfigParam render client config parameters
-func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error) {
-	return c.configParam(cpc, c.clientKeyTemplate, cfs...)
+func (c *client) ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error) {
+	return c.configParam(cpc, c.clientKeyTemplate)
 }
 
 // configParam render config parameters. All the parameters can be customized with CustomFunction.
@@ -166,7 +164,7 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction
 //  4. ServerKey: {{.ServerServiceName}} by default.
 //     ClientKey: {{.ClientServiceName}}.{{.ServerServiceName}} by default.
 //  5. Cluster: default by default
-func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs ...CustomFunction) (ConfigParam, error) {
+func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (ConfigParam, error) {
 	param := ConfigParam{
 		Type:      JSON,
 		nameSpace: cpc.Category,
@@ -179,9 +177,6 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs .
 	param.Cluster, err = c.render(cpc, c.clusterTemplate)
 	if err != nil {
 		return param, err
-	}
-	for _, cf := range cfs {
-		cf(&param)
 	}
 	return param, nil
 }

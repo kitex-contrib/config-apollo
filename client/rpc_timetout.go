@@ -20,21 +20,24 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/kitex-contrib/config-apollo/apollo"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
 
 // WithRPCTimeout sets the RPC timeout policy from apollo configuration center.
 func WithRPCTimeout(dest, src string, apolloClient apollo.Client,
-	cfs ...apollo.CustomFunction,
+	opts utils.Options,
 ) []client.Option {
 	param, err := apolloClient.ClientConfigParam(&apollo.ConfigParamConfig{
 		Category:          apollo.RpcTimeoutConfigName,
 		ServerServiceName: dest,
 		ClientServiceName: src,
-	}, cfs...)
+	})
 	if err != nil {
 		panic(err)
 	}
-
+	for _, f := range opts.ApolloCustomFunctions {
+		f(&param)
+	}
 	return []client.Option{
 		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient)),
 		client.WithCloseCallbacks(func() error {

@@ -28,15 +28,19 @@ import (
 
 // WithCircuitBreaker sets the circuit breaker policy from apollo configuration center.
 func WithCircuitBreaker(dest, src string, apolloClient apollo.Client,
-	cfs ...apollo.CustomFunction,
+	opts utils.Options,
 ) []client.Option {
 	param, err := apolloClient.ClientConfigParam(&apollo.ConfigParamConfig{
 		Category:          apollo.CircuitBreakerConfigName,
 		ServerServiceName: dest,
 		ClientServiceName: src,
-	}, cfs...)
+	})
 	if err != nil {
 		panic(err)
+	}
+
+	for _, f := range opts.ApolloCustomFunctions {
+		f(&param)
 	}
 
 	cbSuite := initCircuitBreaker(param, dest, src, apolloClient)

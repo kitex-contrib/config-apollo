@@ -23,20 +23,23 @@ import (
 	"github.com/cloudwego/kitex/server"
 
 	"github.com/kitex-contrib/config-apollo/apollo"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
 
 // WithLimiter sets the limiter config from apollo configuration center.
 func WithLimiter(dest string, apolloClient apollo.Client,
-	cfs ...apollo.CustomFunction,
+	opts utils.Options,
 ) server.Option {
 	param, err := apolloClient.ServerConfigParam(&apollo.ConfigParamConfig{
 		Category:          apollo.LimiterConfigName,
 		ServerServiceName: dest,
-	}, cfs...)
+	})
 	if err != nil {
 		panic(err)
 	}
-
+	for _, f := range opts.ApolloCustomFunctions {
+		f(&param)
+	}
 	return server.WithLimit(initLimitOptions(param, dest, apolloClient))
 }
 

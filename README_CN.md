@@ -1,14 +1,14 @@
-# config-apollo (*This is a community driven project*)
+# config-apollo 
 
-[中文](https://github.com/kitex-contrib/config-apollo/blob/main/README_CN.md)
+[English](https://github.com/kitex-contrib/config-apollo/blob/main/README.md)
 
-Apollo as config centre.
+使用 **apollo** 作为 **Kitex** 的配置中心
 
-## How to use?
+##  这个项目应当如何使用?
 
-### Basic
+### 基本使用
 
-#### Server
+#### 服务端
 
 ```go
 package main
@@ -74,9 +74,10 @@ func main() {
 		log.Println("server stopped")
 	}
 }
+
 ```
 
-#### Client
+#### 客户端
 
 ```go
 package main
@@ -135,68 +136,66 @@ func main() {
 	}
 }
 ```
+### Apollo 配置
 
-### Apollo Configuration
+根据 Options 的参数初始化 client，建立链接之后 suite 会根据`AppId` `NameSpace` 以及 `ServiceName` 或者 `ClientName` 订阅对应的配置并动态更新自身策略，具体参数参考下面环境变量。 
 
-Initialize the client according to the parameters in Options. After establishing the link, the suite will subscribe to the corresponding configuration based on 'AppId', 'NameSpace', 'ServiceName', or 'ClientName' and dynamically update its own policy. Please refer to the following environment variables for specific parameters.
-
-The configured format supports' json 'by default, and can be customized using the function [SetParser] for format parsing. In' NewSuite ', the field function in the instance that implements the' Option 'interface is used to modify the format of the subscription function.
-####
+配置的格式默认支持 `json` ,可以使用函数 [SetParser](https://github.com/kitex-contrib/config-nacos/blob/eb006978517678dd75a81513142d3faed6a66f8d/nacos/nacos.go#L68) 进行自定义格式解析方式，并在 `NewSuite` 的时候使用 实现了`Option` 接口的实例中的字段函数修改订阅函数的格式。
 
 #### CustomFunction
 
-Allow users to use instances of custom implementation Option interfaces to customize Apollo parameters
+允许用户自定义 apollo 的参数. 
 
-#### Options Variable
+#### Options 默认值
 
-| 参数            |                  变量默认值                   | 作用                                                         |
-| :-------------- | :-------------------------------------------: | ------------------------------------------------------------ |
-| ConfigServerURL |                127.0.0.1:8080                 | apollo config service address                                |
-| nameSpaceID     |                 {{.Category}}                 | WithSuite specifies the rule method for post rendering       |
-| AppID           |                   KitexApp                    | appid of apollo                                              |
-| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}} | Using the go [template](https://pkg.go.dev/text/template) syntax to render and generate the corresponding ID, using two metadata: `ClientServiceName` and `ServiceName` |
-| ServerKeyFormat |     {{.ServerServiceName}}.{{.Category}}      | Using the go [template](https://pkg.go.dev/text/template) Syntax rendering generates corresponding IDs, using 'ServiceName' as a single metadata |
-| cluster         |                    default                    | Using fixed values or dynamic rendering, the usage is the same  as KeyFormat |
+| 参数 | 变量默认值 | 作用 |
+| :------------------------ | :--------------------------------: | --------------------------------- |
+| ConfigServerURL | 127.0.0.1:8080                     | apollo config service 地址 |
+| nameSpaceID | {{.Category}}              | WithSuite指定规则方法后渲染 |
+| AppID            | KitexApp | apollo 的 appid |
+| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ClientServiceName` `ServiceName` 两个元数据 |
+| ServerKeyFormat | {{.ServerServiceName}}.{{.Category}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ServiceName` ` 单个元数据         |
+| cluster             | default                      | 使用固定值，也可以动态渲染，用法同 KeyFormat  |
 
-#### Governance Policy
+#### 治理策略
 
-> The namespace in the following example uses fixed policy values, with default values for APPID and Cluster. The service name is ServiceName and the client name is ClientName
+下面例子中的 namespace 使用策略固定值， APPID 以及 Cluster 均使用默认值，服务名称为 ServiceName，客户端名称为 ClientName
 
-##### Rate Limit Category=limit
-> Currently, current limiting only supports the server side, so ClientServiceName is empty.
+##### 限流 Category=limit
+> 限流目前只支持服务端，所以 ClientServiceName 为空。
 
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/limiter/item_limiter.go#L33)
 
-|Variable|Introduction|
+|字段|说明|
 |----|----|
-|connection_limit| Maximum concurrent connections | 
-|qps_limit| Maximum request number every 100ms | 
-Example:
+|connection_limit|最大并发数量| 
+|qps_limit|每 100ms 内的最大请求数量| 
+
+例子：
 ```
 namespace: `limit`
 key: `ServiceName`
-
 {
-  "connection_limit": 100,
-  "qps_limit": 2000
+  "connection_limit": 100, 
+  "qps_limit": 2000        
 }
 ```
+注：
 
-Note:
+- 限流配置的粒度是 Server 全局，不分 client、method
+- 「未配置」或「取值为 0」表示不开启
+- connection_limit 和 qps_limit 可以独立配置，例如 connection_limit = 100, qps_limit = 0
 
-- The granularity of the current limit configuration is server global, regardless of client or method.
-- Not configured or value is 0 means not enabled.
-- connection_limit and qps_limit can be configured independently, e.g. connection_limit = 100, qps_limit = 0
+##### 重试 Category=retry
 
-##### Retry Policy Category=retry
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/retry/policy.go#L63)
 
-|Variable|Introduction|
+|参数|说明|
 |----|----|
 |type| 0: failure_policy 1: backup_policy| 
-|failure_policy.backoff_policy| Can only be set one of `fixed` `none` `random` | 
+|failure_policy.backoff_policy| 可以设置的策略： `fixed` `none` `random` | 
 
-Example：
+例子：
 ```
 namespace: `retry`
 key: `ClientName.ServiceName`
@@ -238,19 +237,19 @@ key: `ClientName.ServiceName`
     }
 }
 ```
-Note: retry.Container has built-in support for specifying the default configuration using the `*` wildcard (see the [getRetryer](https://github.com/cloudwego/kitex/blob/v0.5.1/pkg/retry/retryer.go#L240) method for details).
+注：retry.Container 内置支持用 * 通配符指定默认配置（详见 [getRetryer](https://github.com/cloudwego/kitex/blob/v0.5.1/pkg/retry/retryer.go#L240) 方法）
 
-##### RPC Timeout Category=rpc_timeout
+##### 超时 Category=rpc_timeout
 
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/rpctimeout/item_rpc_timeout.go#L42)
 
-Example：
+例子：
 ```
 namespace: `rpc_timeout`
 key: `ClientName.ServiceName`
 {
   "*": {
-    "conn_timeout_ms": 100,
+    "conn_timeout_ms": 100, 
     "rpc_timeout_ms": 3000
   },
   "echo": {
@@ -259,18 +258,18 @@ key: `ClientName.ServiceName`
   }
 }
 ```
-Note: The circuit breaker implementation of kitex does not currently support changing the global default configuration (see [initServiceCB](https://github.com/cloudwego/kitex/blob/v0.5.1/pkg/circuitbreak/cbsuite.go#L195) for details).
+注：kitex 的熔断实现目前不支持修改全局默认配置（详见 [initServiceCB](https://github.com/cloudwego/kitex/blob/v0.5.1/pkg/circuitbreak/cbsuite.go#L195)）
 
-##### Circuit Break: Category=circuit_break
+##### 熔断: Category=circuit_break
 
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/circuitbreak/item_circuit_breaker.go#L30)
 
-|Variable|Introduction|
+|参数|说明|
 |----|----|
-|min_sample| Minimum statistical sample number| 
-Example：
+|min_sample| 最小的统计样本数| 
+例子：
 ```
-The echo method uses the following configuration (0.3, 100) and other methods use the global default configuration (0.5, 200)
+echo 方法使用下面的配置（0.3、100），其他方法使用全局默认配置（0.5、200）
 namespace: `circuit_break`
 key: `ClientName.ServiceName`
 {
@@ -281,9 +280,9 @@ key: `ClientName.ServiceName`
   }
 }
 ```
-### More Info
 
-Refer to [example](https://github.com/kitex-contrib/examples/config/apollo) for more usage.
+### 更多信息
 
-maintained by: [xz](https://github.com/XZ0730)
+更多示例请参考 [example](github.com/kitex-contrib/examples/config/apollo)
 
+主要贡献者： [xz](https://github.com/XZ0730)

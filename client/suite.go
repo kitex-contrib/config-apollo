@@ -17,19 +17,20 @@ package client
 import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/kitex-contrib/config-apollo/apollo"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
 
 type ApolloClientSuite struct {
 	apolloClient apollo.Client
 	service      string
 	client       string
-	fns          []apollo.CustomFunction
+	opts         utils.Options
 }
 
 type ClientSuiteOption func(*ApolloClientSuite)
 
 func NewSuite(service, client string, cli apollo.Client,
-	options ...ClientSuiteOption,
+	options ...utils.Option,
 ) *ApolloClientSuite {
 	client_suite := &ApolloClientSuite{
 		service:      service,
@@ -37,39 +38,15 @@ func NewSuite(service, client string, cli apollo.Client,
 		apolloClient: cli,
 	}
 	for _, option := range options {
-		option(client_suite)
+		option.Apply(&client_suite.opts)
 	}
 	return client_suite
 }
 
 func (s *ApolloClientSuite) Options() []client.Option {
 	opts := make([]client.Option, 0, 7)
-	opts = append(opts, WithRetryPolicy(s.service, s.client, s.apolloClient, s.fns...)...)
-	opts = append(opts, WithRPCTimeout(s.service, s.client, s.apolloClient, s.fns...)...)
-	opts = append(opts, WithCircuitBreaker(s.service, s.client, s.apolloClient, s.fns...)...)
+	opts = append(opts, WithRetryPolicy(s.service, s.client, s.apolloClient, s.opts)...)
+	opts = append(opts, WithRPCTimeout(s.service, s.client, s.apolloClient, s.opts)...)
+	opts = append(opts, WithCircuitBreaker(s.service, s.client, s.apolloClient, s.opts)...)
 	return opts
-}
-
-func WithApolloClient(cli apollo.Client) ClientSuiteOption {
-	return func(s *ApolloClientSuite) {
-		s.apolloClient = cli
-	}
-}
-
-func WithClientName(client string) ClientSuiteOption {
-	return func(s *ApolloClientSuite) {
-		s.client = client
-	}
-}
-
-func WithServiceName(service string) ClientSuiteOption {
-	return func(s *ApolloClientSuite) {
-		s.service = service
-	}
-}
-
-func WithConfigParamFunc(fns ...apollo.CustomFunction) ClientSuiteOption {
-	return func(s *ApolloClientSuite) {
-		s.fns = append(s.fns, fns...)
-	}
 }
