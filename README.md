@@ -151,7 +151,7 @@ Allow users to use instances of custom implementation Option interfaces to custo
 
 | 参数            |                  变量默认值                   | 作用                                                         |
 | :-------------- | :-------------------------------------------: | ------------------------------------------------------------ |
-| ConfigServerURL |                127.0.0.1:8080                 | apollo config service addres                                 |
+| ConfigServerURL |                127.0.0.1:8080                 | apollo config service address                                 |
 | AppID           |                   KitexApp                    | appid of apollo                                              |
 | ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}} | Using the go [template](https://pkg.go.dev/text/template) syntax to render and generate the corresponding ID, using two metadata: `ClientServiceName` and `ServiceName` |
 | ServerKeyFormat |     {{.ServerServiceName}}.{{.Category}}      | Using the go [template](https://pkg.go.dev/text/template) Syntax rendering generates corresponding IDs, using 'ServiceName' as a single metadata |
