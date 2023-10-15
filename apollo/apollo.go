@@ -58,9 +58,7 @@ const (
 	LimiterConfigName = "limit"
 )
 
-var (
-	Close sync.Once
-)
+var Close sync.Once
 
 type Options struct {
 	ConfigServerURL string
@@ -220,8 +218,7 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 	go c.listenConfig(param, c.stop, onChange)
 }
 
-func (c *client) listenConfig(param ConfigParam, stop chan bool,
-	callback func(namespace, cluster, key, data string)) {
+func (c *client) listenConfig(param ConfigParam, stop chan bool, callback func(namespace, cluster, key, data string)) {
 	defer func() {
 		if err := recover(); err != nil {
 			klog.Error("[apollo] listen goroutine error:", err)
