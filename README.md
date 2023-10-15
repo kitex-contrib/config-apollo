@@ -138,7 +138,7 @@ func main() {
 
 ### Apollo Configuration
 
-Initialize the client according to the parameters in Options. After establishing the link, the suite will subscribe to the corresponding configuration based on 'AppId', 'NameSpace', 'ServiceName', or 'ClientName' and dynamically update its own policy. Please refer to the following environment variables for specific parameters.
+Initialize the client according to the parameters in Options. After establishing the link, the suite will subscribe to the corresponding configuration based on 'AppId', 'NameSpace', 'ServiceName', or 'ClientName' and dynamically update its own policy. Please refer to the following ·Options· variables for specific parameters.
 
 The configured format supports' json 'by default, and can be customized using the function [SetParser] for format parsing. In' NewSuite ', the field function in the instance that implements the' Option 'interface is used to modify the format of the subscription function.
 ####
@@ -151,12 +151,11 @@ Allow users to use instances of custom implementation Option interfaces to custo
 
 | 参数            |                  变量默认值                   | 作用                                                         |
 | :-------------- | :-------------------------------------------: | ------------------------------------------------------------ |
-| ConfigServerURL |                127.0.0.1:8080                 | apollo config service address                                |
-| nameSpaceID     |                 {{.Category}}                 | WithSuite specifies the rule method for post rendering       |
+| ConfigServerURL |                127.0.0.1:8080                 | apollo config service addres                                 |
 | AppID           |                   KitexApp                    | appid of apollo                                              |
 | ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}} | Using the go [template](https://pkg.go.dev/text/template) syntax to render and generate the corresponding ID, using two metadata: `ClientServiceName` and `ServiceName` |
 | ServerKeyFormat |     {{.ServerServiceName}}.{{.Category}}      | Using the go [template](https://pkg.go.dev/text/template) Syntax rendering generates corresponding IDs, using 'ServiceName' as a single metadata |
-| cluster         |                    default                    | Using fixed values or dynamic rendering, the usage is the same  as KeyFormat |
+| Cluster         |                    default                    | Using fixed values or dynamic rendering, the usage is the same  as KeyFormat |
 
 #### Governance Policy
 

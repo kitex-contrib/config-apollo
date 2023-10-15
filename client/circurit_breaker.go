@@ -53,7 +53,7 @@ func WithCircuitBreaker(dest, src string, apolloClient apollo.Client,
 				return err
 			}
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig(param)
+			return apolloClient.DeregisterConfig()
 		}),
 	}
 }

@@ -44,7 +44,7 @@ func WithRetryPolicy(dest, src string, apolloClient apollo.Client,
 		client.WithCloseCallbacks(rc.Close),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig(param)
+			return apolloClient.DeregisterConfig()
 		}),
 	}
 }

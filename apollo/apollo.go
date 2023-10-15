@@ -16,6 +16,7 @@ package apollo
 
 import (
 	"bytes"
+	"sync"
 	"text/template"
 
 	"github.com/apolloconfig/agollo/v4/component/log"
@@ -29,7 +30,7 @@ type Client interface {
 	ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
 	ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
 	RegisterConfigCallback(ConfigParam, func(string, ConfigParser))
-	DeregisterConfig(ConfigParam) error
+	DeregisterConfig() error
 }
 
 type ConfigParam struct {
@@ -43,6 +44,7 @@ type client struct {
 	acli agollo.Agollo
 	// support customise parser
 	parser            ConfigParser
+	stop              chan bool
 	clusterTemplate   *template.Template
 	serverKeyTemplate *template.Template
 	clientKeyTemplate *template.Template
@@ -56,9 +58,12 @@ const (
 	LimiterConfigName = "limit"
 )
 
+var (
+	Close sync.Once
+)
+
 type Options struct {
 	ConfigServerURL string
-	namespaceID     string
 	AppID           string
 	Cluster         string
 	ServerKeyFormat string
@@ -83,7 +88,6 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	if opts.AppID == "" {
 		opts.AppID = ApolloDefaultAppId
 	}
-	opts.namespaceID = ApolloNameSpace
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
 		opts.ApolloOptions = append(opts.ApolloOptions, agollo.Cluster(opts.Cluster))
@@ -120,6 +124,7 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	cli := &client{
 		acli:              apolloCli,
 		parser:            opts.ConfigParser,
+		stop:              make(chan bool),
 		clusterTemplate:   clusterTemplate,
 		serverKeyTemplate: serverKeyTemplate,
 		clientKeyTemplate: clientKeyTemplate,
@@ -182,7 +187,12 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (Conf
 }
 
 // DeregisterConfig deregister the config.
-func (c *client) DeregisterConfig(cfg ConfigParam) error {
+func (c *client) DeregisterConfig() error {
+	Close.Do(func() {
+		// close listen goroutine
+		close(c.stop)
+	})
+	// close longpoll
 	c.acli.Stop()
 	return nil
 }
@@ -202,22 +212,23 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 	if !ok {
 		klog.Info("key:", param.Key)
 		klog.Info("CONFIG:", configMap)
-		klog.Debug("[apollo] key not found")
+		klog.Warn("[apollo] key not found")
 	} else {
 		callback(data.(string), c.parser)
 	}
 
-	go c.listenConfig(param, onChange)
+	go c.listenConfig(param, c.stop, onChange)
 }
 
-func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluster, key, data string)) {
+func (c *client) listenConfig(param ConfigParam, stop chan bool,
+	callback func(namespace, cluster, key, data string)) {
 	defer func() {
 		if err := recover(); err != nil {
 			klog.Error("[apollo] listen goroutine error:", err)
 		}
 	}()
 	errorsCh := c.acli.Start()
-	apolloRespCh := c.acli.WatchNamespace(param.nameSpace, make(chan bool))
+	apolloRespCh := c.acli.WatchNamespace(param.nameSpace, stop)
 
 	for {
 		select {
@@ -226,9 +237,9 @@ func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluste
 			data, ok := resp.NewValue[param.Key]
 			if !ok {
 				// Deal with delete config
-				klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found",
+				klog.Warnf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found",
 					param.nameSpace, param.nameSpace, param.Cluster, param.Key)
-				klog.Error("[apollo] please recover key from remote config")
+				klog.Warn("[apollo] please recover key from remote config")
 				callback(param.nameSpace, param.Cluster, param.Key, emptyConfig)
 				continue
 			}
@@ -236,6 +247,10 @@ func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluste
 		case err := <-errorsCh:
 			klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error %s",
 				param.nameSpace, param.nameSpace, param.Cluster, param.Key, err.Err.Error())
+			return
+		case <-stop:
+			klog.Warnf("[apollo] config %s exit,namespace %s cluster %s key %s : exit",
+				param.nameSpace, param.nameSpace, param.Cluster, param.Key)
 			return
 		}
 	}

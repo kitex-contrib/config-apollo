@@ -138,7 +138,7 @@ func main() {
 ```
 ### Apollo 配置
 
-根据 Options 的参数初始化 client，建立链接之后 suite 会根据`AppId` `NameSpace` 以及 `ServiceName` 或者 `ClientName` 订阅对应的配置并动态更新自身策略，具体参数参考下面环境变量。 
+根据 Options 的参数初始化 client，建立链接之后 suite 会根据`AppId` `NameSpace` 以及 `ServiceName` 或者 `ClientName` 订阅对应的配置并动态更新自身策略，具体参数参考下面Options。 
 
 配置的格式默认支持 `json` ,可以使用函数 [SetParser](https://github.com/kitex-contrib/config-nacos/blob/eb006978517678dd75a81513142d3faed6a66f8d/nacos/nacos.go#L68) 进行自定义格式解析方式，并在 `NewSuite` 的时候使用 实现了`Option` 接口的实例中的字段函数修改订阅函数的格式。
 
@@ -151,7 +151,6 @@ func main() {
 | 参数 | 变量默认值 | 作用 |
 | :------------------------ | :--------------------------------: | --------------------------------- |
 | ConfigServerURL | 127.0.0.1:8080                     | apollo config service 地址 |
-| nameSpaceID | {{.Category}}              | WithSuite指定规则方法后渲染 |
 | AppID            | KitexApp | apollo 的 appid |
 | ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ClientServiceName` `ServiceName` 两个元数据 |
 | ServerKeyFormat | {{.ServerServiceName}}.{{.Category}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ServiceName` ` 单个元数据         |
