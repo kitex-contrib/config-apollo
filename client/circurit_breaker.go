@@ -43,17 +43,19 @@ func WithCircuitBreaker(dest, src string, apolloClient apollo.Client,
 		f(&param)
 	}
 
-	cbSuite := initCircuitBreaker(param, dest, src, apolloClient)
+	uniqueID := apollo.GetUniqueID()
+
+	cbSuite := initCircuitBreaker(param, dest, src, apolloClient, uniqueID)
 
 	return []client.Option{
 		client.WithCircuitBreaker(cbSuite),
 		client.WithCloseCallbacks(func() error {
-			err := cbSuite.Close()
+			err := apolloClient.DeregisterConfig(uniqueID)
 			if err != nil {
 				return err
 			}
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig()
+			return cbSuite.Close()
 		}),
 	}
 }
@@ -78,7 +80,7 @@ func genServiceCBKey(toService, method string) string {
 }
 
 func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
-	apolloClient apollo.Client,
+	apolloClient apollo.Client, uniqueID int64,
 ) *circuitbreak.CBSuite {
 	cb := circuitbreak.NewCBSuite(genServiceCBKeyWithRPCInfo)
 	lcb := utils.ThreadSafeSet{}
@@ -105,7 +107,7 @@ func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
 		}
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 
 	return cb
 }

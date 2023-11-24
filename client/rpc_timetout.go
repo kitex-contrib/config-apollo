@@ -38,17 +38,20 @@ func WithRPCTimeout(dest, src string, apolloClient apollo.Client,
 	for _, f := range opts.ApolloCustomFunctions {
 		f(&param)
 	}
+
+	uniqueID := apollo.GetUniqueID()
+
 	return []client.Option{
-		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient)),
+		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient, uniqueID)),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig()
+			return apolloClient.DeregisterConfig(uniqueID)
 		}),
 	}
 }
 
 func initRPCTimeoutContainer(param apollo.ConfigParam, dest string,
-	apolloClient apollo.Client,
+	apolloClient apollo.Client, uniqueID int64,
 ) rpcinfo.TimeoutProvider {
 	rpcTimeoutContainer := rpctimeout.NewContainer()
 
@@ -62,7 +65,7 @@ func initRPCTimeoutContainer(param apollo.ConfigParam, dest string,
 		rpcTimeoutContainer.NotifyPolicyChange(configs)
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 
 	return rpcTimeoutContainer
 }

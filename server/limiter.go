@@ -40,10 +40,14 @@ func WithLimiter(dest string, apolloClient apollo.Client,
 	for _, f := range opts.ApolloCustomFunctions {
 		f(&param)
 	}
-	return server.WithLimit(initLimitOptions(param, dest, apolloClient))
+	uniqueID := apollo.GetUniqueID()
+	server.RegisterShutdownHook(func() {
+		apolloClient.DeregisterConfig(uniqueID)
+	})
+	return server.WithLimit(initLimitOptions(param, dest, apolloClient, uniqueID))
 }
 
-func initLimitOptions(param apollo.ConfigParam, dest string, apolloClient apollo.Client) *limit.Option {
+func initLimitOptions(param apollo.ConfigParam, dest string, apolloClient apollo.Client, uniqueID int64) *limit.Option {
 	var updater atomic.Value
 	opt := &limit.Option{}
 	opt.UpdateControl = func(u limit.Updater) {
@@ -70,6 +74,6 @@ func initLimitOptions(param apollo.ConfigParam, dest string, apolloClient apollo
 		}
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 	return opt
 }

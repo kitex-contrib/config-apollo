@@ -38,19 +38,25 @@ func WithRetryPolicy(dest, src string, apolloClient apollo.Client,
 		f(&param)
 	}
 
-	rc := initRetryContainer(param, dest, apolloClient)
+	uniqueID := apollo.GetUniqueID()
+
+	rc := initRetryContainer(param, dest, apolloClient, uniqueID)
 	return []client.Option{
 		client.WithRetryContainer(rc),
 		client.WithCloseCallbacks(rc.Close),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig()
+			err := apolloClient.DeregisterConfig(uniqueID)
+			if err != nil {
+				return err
+			}
+			return rc.Close()
 		}),
 	}
 }
 
 func initRetryContainer(param apollo.ConfigParam, dest string,
-	apolloClient apollo.Client,
+	apolloClient apollo.Client, uniqueID int64,
 ) *retry.Container {
 	retryContainer := retry.NewRetryContainerWithPercentageLimit()
 
@@ -86,7 +92,7 @@ func initRetryContainer(param apollo.ConfigParam, dest string,
 		}
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 
 	return retryContainer
 }
