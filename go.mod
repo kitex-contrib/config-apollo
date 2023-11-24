@@ -1,6 +1,6 @@
 module github.com/kitex-contrib/config-apollo
 
-go 1.21.1
+go 1.19
 
 require (
 	github.com/apolloconfig/agollo/v4 v4.3.1
