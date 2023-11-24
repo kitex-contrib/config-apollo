@@ -1,6 +1,6 @@
 # config-apollo 
 
-[English](https://github.com/kitex-contrib/config-apollo/blob/main/README.md)
+[English](README.md)
 
 使用 **apollo** 作为 **Kitex** 的配置中心
 

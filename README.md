@@ -1,6 +1,6 @@
 # config-apollo (*This is a community driven project*)
 
-[中文](https://github.com/kitex-contrib/config-apollo/blob/main/README_CN.md)
+[中文](README_CN.md)
 
 Apollo as config centre.
 
