@@ -50,7 +50,7 @@ func WithCircuitBreaker(dest, src string, apolloClient apollo.Client,
 	return []client.Option{
 		client.WithCircuitBreaker(cbSuite),
 		client.WithCloseCallbacks(func() error {
-			err := apolloClient.DeregisterConfig(uniqueID)
+			err := apolloClient.DeregisterConfig(param, uniqueID)
 			if err != nil {
 				return err
 			}

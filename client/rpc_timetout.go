@@ -45,7 +45,7 @@ func WithRPCTimeout(dest, src string, apolloClient apollo.Client,
 		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient, uniqueID)),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig(uniqueID)
+			return apolloClient.DeregisterConfig(param, uniqueID)
 		}),
 	}
 }

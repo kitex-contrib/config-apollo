@@ -42,7 +42,7 @@ func WithLimiter(dest string, apolloClient apollo.Client,
 	}
 	uniqueID := apollo.GetUniqueID()
 	server.RegisterShutdownHook(func() {
-		apolloClient.DeregisterConfig(uniqueID)
+		apolloClient.DeregisterConfig(param, uniqueID)
 	})
 	return server.WithLimit(initLimitOptions(param, dest, apolloClient, uniqueID))
 }

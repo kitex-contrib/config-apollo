@@ -30,7 +30,7 @@ type Client interface {
 	ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
 	ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
 	RegisterConfigCallback(ConfigParam, func(string, ConfigParser), int64)
-	DeregisterConfig(int64) error
+	DeregisterConfig(ConfigParam, int64) error
 }
 
 type ConfigParam struct {
@@ -206,13 +206,24 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (Conf
 }
 
 // DeregisterConfig deregister the config.
-func (c *client) DeregisterConfig(uniqueID int64) error {
-	Close.Do(func() {
-		// close listen goroutine
-		close(c.stop)
-	})
-	// close longpoll
-	c.acli.Stop()
+func (c *client) DeregisterConfig(cfg ConfigParam, uniqueID int64) error {
+	configkey := getConfigParamKey(&cfg)
+	klog.Debugf("deregister key %v for uniqueID %d", configkey, uniqueID)
+	c.handlerMutex.Lock()
+	defer c.handlerMutex.Unlock()
+	handlers, ok := c.handlers[configkey]
+	if ok {
+		delete(handlers, uniqueID)
+	}
+	// Stop when users is null
+	if len(handlers) == 0 {
+		Close.Do(func() {
+			// close listen goroutine
+			close(c.stop)
+		})
+		// close longpoll
+		c.acli.Stop()
+	}
 	return nil
 }
 
