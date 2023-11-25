@@ -28,6 +28,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {

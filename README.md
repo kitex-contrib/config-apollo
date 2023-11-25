@@ -28,6 +28,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {
@@ -54,7 +55,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	serviceName := "ServiceName"
+	serviceName := "ServiceName" // server-side service name
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)
@@ -95,6 +96,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {
@@ -106,18 +108,17 @@ func (cl *configLog) Apply(opt *utils.Options) {
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-
 	apolloClient, err := apollo.NewClient(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}
 	cl := &configLog{}
 
-	serviceName := "ServiceName"
-	clientName := "ClientName"
+	serviceName := "ServiceName" // your server-side service name
+	clientName := "ClientName"   // your client-side service name
 	client, err := echo.NewClient(
 		serviceName,
-		client.WithHostPorts("0.0.0.0:8899"),
+		client.WithHostPorts("localhost:8899"),
 		client.WithSuite(apolloclient.NewSuite(serviceName, clientName, apolloClient, cl)),
 	)
 	if err != nil {
@@ -151,11 +152,11 @@ Allow users to use instances of custom implementation Option interfaces to custo
 
 | 参数            |                  变量默认值                   | 作用                                                         |
 | :-------------- | :-------------------------------------------: | ------------------------------------------------------------ |
-| ConfigServerURL |                127.0.0.1:8080                 | apollo config service address                                 |
-| AppID           |                   KitexApp                    | appid of apollo                                              |
-| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}} | Using the go [template](https://pkg.go.dev/text/template) syntax to render and generate the corresponding ID, using two metadata: `ClientServiceName` and `ServiceName` |
-| ServerKeyFormat |     {{.ServerServiceName}}.{{.Category}}      | Using the go [template](https://pkg.go.dev/text/template) Syntax rendering generates corresponding IDs, using 'ServiceName' as a single metadata |
-| Cluster         |                    default                    | Using fixed values or dynamic rendering, the usage is the same  as KeyFormat |
+| ConfigServerURL |                127.0.0.1:8080                 | apollo config service address                                |
+| AppID           |                   KitexApp                    | appid of apollo (Uniqueness constraint / Length limit of 32 characters) |
+| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}} | Using the go [template](https://pkg.go.dev/text/template) syntax to render and generate the corresponding ID, using two metadata: `ClientServiceName` and `ServiceName` (Length limit of 128 characters) |
+| ServerKeyFormat |            {{.ServerServiceName}}             | Using the go [template](https://pkg.go.dev/text/template) Syntax rendering generates corresponding IDs, using 'ServiceName' as a single metadata (Length limit of 128 characters) |
+| Cluster         |                    default                    | Using default values, users can assign values as needed (Length limit of 32 characters) |
 
 #### Governance Policy
 
@@ -171,7 +172,7 @@ Allow users to use instances of custom implementation Option interfaces to custo
 |connection_limit| Maximum concurrent connections | 
 |qps_limit| Maximum request number every 100ms | 
 Example:
-```
+```json
 namespace: `limit`
 key: `ServiceName`
 
@@ -196,7 +197,7 @@ Note:
 |failure_policy.backoff_policy| Can only be set one of `fixed` `none` `random` | 
 
 Example：
-```
+```json
 namespace: `retry`
 key: `ClientName.ServiceName`
 {
@@ -208,7 +209,7 @@ key: `ClientName.ServiceName`
                 "max_retry_times": 3,
                 "max_duration_ms": 2000,
                 "cb_policy": {
-                    "error_rate": 0.5
+                    "error_rate": 0.3
                 }
             },
             "backoff_policy": {
@@ -244,7 +245,7 @@ Note: retry.Container has built-in support for specifying the default configurat
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/rpctimeout/item_rpc_timeout.go#L42)
 
 Example：
-```
+```json
 namespace: `rpc_timeout`
 key: `ClientName.ServiceName`
 {
@@ -268,7 +269,7 @@ Note: The circuit breaker implementation of kitex does not currently support cha
 |----|----|
 |min_sample| Minimum statistical sample number| 
 Example：
-```
+```json
 The echo method uses the following configuration (0.3, 100) and other methods use the global default configuration (0.5, 200)
 namespace: `circuit_break`
 key: `ClientName.ServiceName`

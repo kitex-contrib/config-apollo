@@ -28,6 +28,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {
@@ -54,7 +55,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	serviceName := "ServiceName"
+	serviceName := "ServiceName" // server-side service name
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)
@@ -74,7 +75,6 @@ func main() {
 		log.Println("server stopped")
 	}
 }
-
 ```
 
 #### 客户端
@@ -96,6 +96,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {
@@ -107,18 +108,17 @@ func (cl *configLog) Apply(opt *utils.Options) {
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-
 	apolloClient, err := apollo.NewClient(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}
 	cl := &configLog{}
 
-	serviceName := "ServiceName"
-	clientName := "ClientName"
+	serviceName := "ServiceName" // your server-side service name
+	clientName := "ClientName"   // your client-side service name
 	client, err := echo.NewClient(
 		serviceName,
-		client.WithHostPorts("0.0.0.0:8899"),
+		client.WithHostPorts("localhost:8899"),
 		client.WithSuite(apolloclient.NewSuite(serviceName, clientName, apolloClient, cl)),
 	)
 	if err != nil {
@@ -151,10 +151,10 @@ func main() {
 | 参数 | 变量默认值 | 作用 |
 | :------------------------ | :--------------------------------: | --------------------------------- |
 | ConfigServerURL | 127.0.0.1:8080                     | apollo config service 地址 |
-| AppID            | KitexApp | apollo 的 appid |
-| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ClientServiceName` `ServiceName` 两个元数据 |
-| ServerKeyFormat | {{.ServerServiceName}}.{{.Category}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ServiceName` ` 单个元数据         |
-| cluster             | default                      | 使用固定值，也可以动态渲染，用法同 KeyFormat  |
+| AppID            | KitexApp | apollo 的 appid (唯一性约束) |
+| ClientKeyFormat | {{.ClientServiceName}}.{{.ServerServiceName}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ClientServiceName` `ServiceName` 两个元数据 (长度不超过128个字符) |
+| ServerKeyFormat | {{.ServerServiceName}}  | 使用 go [template](https://pkg.go.dev/text/template) 语法渲染生成对应的 ID, 使用 `ServiceName` ` 单个元数据 (长度不超过128个字符) |
+| Cluster             | default                      | 使用默认值，用户可根据需要赋值 (长度不超过32个字符) |
 
 #### 治理策略
 
@@ -171,7 +171,7 @@ func main() {
 |qps_limit|每 100ms 内的最大请求数量| 
 
 例子：
-```
+```json
 namespace: `limit`
 key: `ServiceName`
 {
@@ -195,7 +195,7 @@ key: `ServiceName`
 |failure_policy.backoff_policy| 可以设置的策略： `fixed` `none` `random` | 
 
 例子：
-```
+```json
 namespace: `retry`
 key: `ClientName.ServiceName`
 {
@@ -207,7 +207,7 @@ key: `ClientName.ServiceName`
                 "max_retry_times": 3,
                 "max_duration_ms": 2000,
                 "cb_policy": {
-                    "error_rate": 0.5
+                    "error_rate": 0.3
                 }
             },
             "backoff_policy": {
@@ -243,7 +243,7 @@ key: `ClientName.ServiceName`
 [JSON Schema](https://github.com/cloudwego/kitex/blob/develop/pkg/rpctimeout/item_rpc_timeout.go#L42)
 
 例子：
-```
+```json
 namespace: `rpc_timeout`
 key: `ClientName.ServiceName`
 {
@@ -267,7 +267,7 @@ key: `ClientName.ServiceName`
 |----|----|
 |min_sample| 最小的统计样本数| 
 例子：
-```
+```json
 echo 方法使用下面的配置（0.3、100），其他方法使用全局默认配置（0.5、200）
 namespace: `circuit_break`
 key: `ClientName.ServiceName`

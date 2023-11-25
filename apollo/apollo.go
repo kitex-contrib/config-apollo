@@ -108,7 +108,6 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	}
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
-		opts.ApolloOptions = append(opts.ApolloOptions, agollo.Cluster(opts.Cluster))
 	}
 	if opts.ServerKeyFormat == "" {
 		opts.ServerKeyFormat = ApolloDefaultServerKey
@@ -117,6 +116,7 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 		opts.ClientKeyFormat = ApolloDefaultClientKey
 	}
 	opts.ApolloOptions = append(opts.ApolloOptions,
+		agollo.Cluster(opts.Cluster),
 		agollo.AutoFetchOnCacheMiss(),
 		agollo.FailTolerantOnBackupExists(),
 	)
@@ -184,7 +184,7 @@ func (c *client) ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error) 
 // ConfigParam explain:
 //  1. Type: key format, support JSON and YAML, JSON by default. Could extend it by implementing the ConfigParser interface.
 //  2. Content: empty by default. Customize with CustomFunction.
-//  3. NameSpace: select by user.
+//  3. NameSpace: select by user (retry / circuit_breaker / rpc_timeout / limit).
 //  4. ServerKey: {{.ServerServiceName}} by default.
 //     ClientKey: {{.ClientServiceName}}.{{.ServerServiceName}} by default.
 //  5. Cluster: default by default

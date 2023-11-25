@@ -29,6 +29,7 @@ import (
 	"github.com/kitex-contrib/config-apollo/utils"
 )
 
+// Customed by user
 type configLog struct{}
 
 func (cl *configLog) Apply(opt *utils.Options) {
@@ -55,7 +56,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	serviceName := "ServiceName"
+	serviceName := "ServiceName" // server-side service name
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)
