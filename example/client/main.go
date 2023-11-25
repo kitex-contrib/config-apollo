@@ -45,8 +45,8 @@ func main() {
 	}
 	cl := &configLog{}
 
-	serviceName := "ServiceName"
-	clientName := "ClientName"
+	serviceName := "ServiceName" // your server-side service name
+	clientName := "ClientName"   // your client-side service name
 	client, err := echo.NewClient(
 		serviceName,
 		client.WithHostPorts("localhost:8899"),

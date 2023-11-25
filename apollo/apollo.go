@@ -54,6 +54,7 @@ func getConfigParamKey(in *ConfigParam) configParamKey {
 	return configParamKey{
 		Key:       in.Key,
 		NameSpace: in.nameSpace,
+		Cluster:   in.Cluster,
 	}
 }
 
@@ -145,7 +146,7 @@ func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 		clusterTemplate:   clusterTemplate,
 		serverKeyTemplate: serverKeyTemplate,
 		clientKeyTemplate: clientKeyTemplate,
-		handlers:          map[configParamKey]map[int64]callbackHandler{},
+		handlers:          make(map[configParamKey]map[int64]callbackHandler),
 	}
 
 	return cli, nil
@@ -229,7 +230,6 @@ func (c *client) onChange(namespace, cluster, key, data string) {
 		handlers = append(handlers, handler)
 	}
 	c.handlerMutex.RUnlock()
-
 	for _, handler := range handlers {
 		handler(namespace, cluster, key, data)
 	}
@@ -269,7 +269,7 @@ func (c *client) listenConfig(param ConfigParam, stop chan bool, callback func(n
 	c.handlerMutex.Lock()
 	handlers, ok := c.handlers[configKey]
 	if !ok {
-		handlers := map[int64]callbackHandler{}
+		handlers = make(map[int64]callbackHandler)
 		c.handlers[configKey] = handlers
 	}
 	handlers[uniqueID] = callback

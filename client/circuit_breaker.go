@@ -90,7 +90,7 @@ func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
 		configs := map[string]circuitbreak.CBConfig{}
 		err := parser.Decode(param.Type, data, &configs)
 		if err != nil {
-			klog.Warnf("[apollo] %s client apollo rpc timeout: unmarshal data %s failed: %s, skip...", dest, data, err)
+			klog.Warnf("[apollo] %s client apollo circuit breakr: unmarshal data %s failed: %s, skip...", dest, data, err)
 			return
 		}
 
