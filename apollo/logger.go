@@ -19,6 +19,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
+func init() {
+	log.InitLogger(NewCustomApolloLogger())
+}
+
 type customApolloLogger struct{}
 
 func NewCustomApolloLogger() log.LoggerInterface {

@@ -207,11 +207,11 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (Conf
 
 // DeregisterConfig deregister the config.
 func (c *client) DeregisterConfig(cfg ConfigParam, uniqueID int64) error {
-	configkey := getConfigParamKey(&cfg)
-	klog.Debugf("deregister key %v for uniqueID %d", configkey, uniqueID)
+	configKey := getConfigParamKey(&cfg)
+	klog.Debugf("deregister key %v for uniqueID %d", configKey, uniqueID)
 	c.handlerMutex.Lock()
 	defer c.handlerMutex.Unlock()
-	handlers, ok := c.handlers[configkey]
+	handlers, ok := c.handlers[configKey]
 	if ok {
 		delete(handlers, uniqueID)
 	}
@@ -232,12 +232,12 @@ func (c *client) onChange(namespace, cluster, key, data string) {
 	handlers := make([]callbackHandler, 0, 5)
 
 	c.handlerMutex.RLock()
-	configkey := configParamKey{
+	configKey := configParamKey{
 		Key:       key,
 		NameSpace: namespace,
 		Cluster:   cluster,
 	}
-	for _, handler := range c.handlers[configkey] {
+	for _, handler := range c.handlers[configKey] {
 		handlers = append(handlers, handler)
 	}
 	c.handlerMutex.RUnlock()
