@@ -20,32 +20,38 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/kitex-contrib/config-apollo/apollo"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
 
 // WithRPCTimeout sets the RPC timeout policy from apollo configuration center.
 func WithRPCTimeout(dest, src string, apolloClient apollo.Client,
-	cfs ...apollo.CustomFunction,
+	opts utils.Options,
 ) []client.Option {
 	param, err := apolloClient.ClientConfigParam(&apollo.ConfigParamConfig{
 		Category:          apollo.RpcTimeoutConfigName,
 		ServerServiceName: dest,
 		ClientServiceName: src,
-	}, cfs...)
+	})
 	if err != nil {
 		panic(err)
 	}
+	for _, f := range opts.ApolloCustomFunctions {
+		f(&param)
+	}
+
+	uniqueID := apollo.GetUniqueID()
 
 	return []client.Option{
-		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient)),
+		client.WithTimeoutProvider(initRPCTimeoutContainer(param, dest, apolloClient, uniqueID)),
 		client.WithCloseCallbacks(func() error {
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig(param)
+			return apolloClient.DeregisterConfig(param, uniqueID)
 		}),
 	}
 }
 
 func initRPCTimeoutContainer(param apollo.ConfigParam, dest string,
-	apolloClient apollo.Client,
+	apolloClient apollo.Client, uniqueID int64,
 ) rpcinfo.TimeoutProvider {
 	rpcTimeoutContainer := rpctimeout.NewContainer()
 
@@ -59,7 +65,7 @@ func initRPCTimeoutContainer(param apollo.ConfigParam, dest string,
 		rpcTimeoutContainer.NotifyPolicyChange(configs)
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 
 	return rpcTimeoutContainer
 }

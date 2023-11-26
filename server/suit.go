@@ -17,29 +17,32 @@ package server
 import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/kitex-contrib/config-apollo/apollo"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
 
 // ApolloServerSuite apollo server config suite, configure limiter config dynamically from apollo.
 type ApolloServerSuite struct {
 	apolloClient apollo.Client
 	service      string
-	fns          []apollo.CustomFunction
+	opts         utils.Options
 }
 
 // NewSuite service is the destination service.
-func NewSuite(service string, cli apollo.Client,
-	cfs ...apollo.CustomFunction,
+func NewSuite(service string, cli apollo.Client, options ...utils.Option,
 ) *ApolloServerSuite {
-	return &ApolloServerSuite{
+	server_suite := &ApolloServerSuite{
 		service:      service,
 		apolloClient: cli,
-		fns:          cfs,
 	}
+	for _, option := range options {
+		option.Apply(&server_suite.opts)
+	}
+	return server_suite
 }
 
 // Options return a list client.Option
 func (s *ApolloServerSuite) Options() []server.Option {
 	opts := make([]server.Option, 0, 2)
-	opts = append(opts, WithLimiter(s.service, s.apolloClient, s.fns...))
+	opts = append(opts, WithLimiter(s.service, s.apolloClient, s.opts))
 	return opts
 }

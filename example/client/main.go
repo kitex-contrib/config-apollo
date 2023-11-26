@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
 
 package main
 
@@ -26,29 +25,33 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/kitex-contrib/config-apollo/apollo"
 	apolloclient "github.com/kitex-contrib/config-apollo/client"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
+
+// Customed by user
+type configLog struct{}
+
+func (cl *configLog) Apply(opt *utils.Options) {
+	fn := func(cp *apollo.ConfigParam) {
+		klog.Infof("apollo config %v", cp)
+	}
+	opt.ApolloCustomFunctions = append(opt.ApolloCustomFunctions, fn)
+}
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-
-	apolloClient, err := apollo.NewOptions(apollo.Options{})
+	apolloClient, err := apollo.NewClient(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}
+	cl := &configLog{}
 
-	fn := func(cp *apollo.ConfigParam) {
-		klog.Infof("apollo config %v", cp)
-		klog.Infof("apollo namespace: %v", cp.NameSpace)
-		klog.Infof("apollo key: %v", cp.Key)
-		klog.Infof("apollo cluster: %v", cp.Cluster)
-	}
-
-	serviceName := "temp"
-	clientName := "echo"
+	serviceName := "ServiceName" // your server-side service name
+	clientName := "ClientName"   // your client-side service name
 	client, err := echo.NewClient(
 		serviceName,
-		client.WithHostPorts("0.0.0.0:8899"),
-		client.WithSuite(apolloclient.NewSuite(serviceName, clientName, apolloClient, fn)),
+		client.WithHostPorts("localhost:8899"),
+		client.WithSuite(apolloclient.NewSuite(serviceName, clientName, apolloClient, cl)),
 	)
 	if err != nil {
 		log.Fatal(err)

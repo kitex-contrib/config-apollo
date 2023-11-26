@@ -26,7 +26,18 @@ import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/kitex-contrib/config-apollo/apollo"
 	apolloserver "github.com/kitex-contrib/config-apollo/server"
+	"github.com/kitex-contrib/config-apollo/utils"
 )
+
+// Customed by user
+type configLog struct{}
+
+func (cl *configLog) Apply(opt *utils.Options) {
+	fn := func(cp *apollo.ConfigParam) {
+		klog.Infof("apollo config %v", cp)
+	}
+	opt.ApolloCustomFunctions = append(opt.ApolloCustomFunctions, fn)
+}
 
 var _ api.Echo = &EchoImpl{}
 
@@ -41,25 +52,22 @@ func (s *EchoImpl) Echo(ctx context.Context, req *api.Request) (resp *api.Respon
 
 func main() {
 	klog.SetLevel(klog.LevelDebug)
-	apolloClient, err := apollo.NewOptions(apollo.Options{})
+	apolloClient, err := apollo.NewClient(apollo.Options{})
 	if err != nil {
 		panic(err)
 	}
-	fn := func(cp *apollo.ConfigParam) {
-		klog.Infof("apollo config %v", cp)
-		klog.Infof("apollo namespace: %v", cp.NameSpace)
-		klog.Infof("apollo key: %v", cp.Key)
-		klog.Infof("apollo cluster: %v", cp.Cluster)
-	}
-	serviceName := "echo"
+	serviceName := "ServiceName" // server-side service name
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:8899")
 	if err != nil {
 		panic(err)
 	}
+
+	cl := &configLog{}
+
 	svr := echo.NewServer(
 		new(EchoImpl),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: serviceName}),
-		server.WithSuite(apolloserver.NewSuite(serviceName, apolloClient, fn)),
+		server.WithSuite(apolloserver.NewSuite(serviceName, apolloClient, cl)),
 		server.WithServiceAddr(addr),
 	)
 	if err := svr.Run(); err != nil {

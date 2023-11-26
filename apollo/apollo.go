@@ -16,10 +16,10 @@ package apollo
 
 import (
 	"bytes"
-	"errors"
+	"runtime/debug"
+	"sync"
 	"text/template"
 
-	"github.com/apolloconfig/agollo/v4/component/log"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/shima-park/agollo"
 )
@@ -27,27 +27,47 @@ import (
 // Client the wrapper of apollo client.
 type Client interface {
 	SetParser(ConfigParser)
-	ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
-	ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error)
-	RegisterConfigCallback(ConfigParam, func(string, ConfigParser))
-	DeregisterConfig(ConfigParam) error
+	ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
+	ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error)
+	RegisterConfigCallback(ConfigParam, func(string, ConfigParser), int64)
+	DeregisterConfig(ConfigParam, int64) error
 }
 
 type ConfigParam struct {
 	Key       string
+	nameSpace string
+	Cluster   string
+	Type      ConfigType
+}
+
+type callbackHandler func(namespace, cluster, key, data string)
+
+type configParamKey struct {
+	Key       string
 	NameSpace string
 	Cluster   string
-	Content   string
-	Type      ConfigType
+}
+
+// namespace: category
+// key: ClientService.ServerService
+func getConfigParamKey(in *ConfigParam) configParamKey {
+	return configParamKey{
+		Key:       in.Key,
+		NameSpace: in.nameSpace,
+		Cluster:   in.Cluster,
+	}
 }
 
 type client struct {
 	acli agollo.Agollo
 	// support customise parser
 	parser            ConfigParser
+	stop              chan bool
 	clusterTemplate   *template.Template
 	serverKeyTemplate *template.Template
 	clientKeyTemplate *template.Template
+	handlerMutex      sync.RWMutex
+	handlers          map[configParamKey]map[int64]callbackHandler
 }
 
 const (
@@ -58,35 +78,29 @@ const (
 	LimiterConfigName = "limit"
 )
 
+var Close sync.Once
+
 type Options struct {
 	ConfigServerURL string
-	NamespaceID     string
 	AppID           string
 	Cluster         string
 	ServerKeyFormat string
 	ClientKeyFormat string
-	IsPrivate       bool
-	AccessKey       string
-	BackupFilePath  string
-	CustomLogger    log.LoggerInterface
+	ApolloOptions   []agollo.Option
 	ConfigParser    ConfigParser
 }
 
-func NewOptions(opts Options) (Client, error) {
+type OptionFunc func(option *Options)
+
+func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	if opts.ConfigServerURL == "" {
 		opts.ConfigServerURL = ApolloDefaultConfigServerURL
-	}
-	if opts.CustomLogger == nil {
-		opts.CustomLogger = NewCustomApolloLogger()
 	}
 	if opts.ConfigParser == nil {
 		opts.ConfigParser = defaultConfigParse()
 	}
 	if opts.AppID == "" {
 		opts.AppID = ApolloDefaultAppId
-	}
-	if opts.NamespaceID == "" {
-		opts.NamespaceID = ApolloNameSpace
 	}
 	if opts.Cluster == "" {
 		opts.Cluster = ApolloDefaultCluster
@@ -97,22 +111,15 @@ func NewOptions(opts Options) (Client, error) {
 	if opts.ClientKeyFormat == "" {
 		opts.ClientKeyFormat = ApolloDefaultClientKey
 	}
-	agolloOption := []agollo.Option{
+	opts.ApolloOptions = append(opts.ApolloOptions,
 		agollo.Cluster(opts.Cluster),
-		agollo.PreloadNamespaces([]string{RetryConfigName, RpcTimeoutConfigName, CircuitBreakerConfigName, LimiterConfigName}...),
 		agollo.AutoFetchOnCacheMiss(),
 		agollo.FailTolerantOnBackupExists(),
+	)
+	for _, option := range optsfunc {
+		option(&opts)
 	}
-	if opts.IsPrivate {
-		if opts.AccessKey == "" {
-			return nil, errors.New("[apollo] need accesskey for private namespace")
-		}
-		agolloOption = append(agolloOption, agollo.AccessKey(opts.AccessKey))
-	}
-	if opts.BackupFilePath != "" {
-		agolloOption = append(agolloOption, agollo.BackupFile(opts.BackupFilePath))
-	}
-	apolloCli, err := agollo.New(opts.ConfigServerURL, opts.AppID, agolloOption...)
+	apolloCli, err := agollo.New(opts.ConfigServerURL, opts.AppID, opts.ApolloOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,12 +138,20 @@ func NewOptions(opts Options) (Client, error) {
 	cli := &client{
 		acli:              apolloCli,
 		parser:            opts.ConfigParser,
+		stop:              make(chan bool),
 		clusterTemplate:   clusterTemplate,
 		serverKeyTemplate: serverKeyTemplate,
 		clientKeyTemplate: clientKeyTemplate,
+		handlers:          make(map[configParamKey]map[int64]callbackHandler),
 	}
 
 	return cli, nil
+}
+
+func WithApolloOption(apolloOption ...agollo.Option) OptionFunc {
+	return func(option *Options) {
+		option.ApolloOptions = append(option.ApolloOptions, apolloOption...)
+	}
 }
 
 func (c *client) SetParser(parser ConfigParser) {
@@ -152,28 +167,27 @@ func (c *client) render(cpc *ConfigParamConfig, t *template.Template) (string, e
 	return tpl.String(), nil
 }
 
-func (c *client) ServerConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error) {
-	return c.configParam(cpc, c.serverKeyTemplate, cfs...)
+func (c *client) ServerConfigParam(cpc *ConfigParamConfig) (ConfigParam, error) {
+	return c.configParam(cpc, c.serverKeyTemplate)
 }
 
 // ClientConfigParam render client config parameters
-func (c *client) ClientConfigParam(cpc *ConfigParamConfig, cfs ...CustomFunction) (ConfigParam, error) {
-	return c.configParam(cpc, c.clientKeyTemplate, cfs...)
+func (c *client) ClientConfigParam(cpc *ConfigParamConfig) (ConfigParam, error) {
+	return c.configParam(cpc, c.clientKeyTemplate)
 }
 
 // configParam render config parameters. All the parameters can be customized with CustomFunction.
 // ConfigParam explain:
 //  1. Type: key format, support JSON and YAML, JSON by default. Could extend it by implementing the ConfigParser interface.
 //  2. Content: empty by default. Customize with CustomFunction.
-//  3. NameSpace: select by user.
+//  3. NameSpace: select by user (retry / circuit_breaker / rpc_timeout / limit).
 //  4. ServerKey: {{.ServerServiceName}} by default.
 //     ClientKey: {{.ClientServiceName}}.{{.ServerServiceName}} by default.
-//  5. Cluster: DEFAULT_CLUSTER by default
-func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs ...CustomFunction) (ConfigParam, error) {
+//  5. Cluster: default by default
+func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (ConfigParam, error) {
 	param := ConfigParam{
 		Type:      JSON,
-		Content:   defaultContent,
-		NameSpace: cpc.Category,
+		nameSpace: cpc.Category,
 	}
 	var err error
 	param.Key, err = c.render(cpc, t)
@@ -184,61 +198,115 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template, cfs .
 	if err != nil {
 		return param, err
 	}
-	for _, cf := range cfs {
-		cf(&param)
-	}
 	return param, nil
 }
 
 // DeregisterConfig deregister the config.
-func (c *client) DeregisterConfig(cfg ConfigParam) error {
-	c.acli.Stop()
+func (c *client) DeregisterConfig(cfg ConfigParam, uniqueID int64) error {
+	configKey := getConfigParamKey(&cfg)
+	klog.Debugf("deregister key %v for uniqueID %d", configKey, uniqueID)
+	c.handlerMutex.Lock()
+	defer c.handlerMutex.Unlock()
+	handlers, ok := c.handlers[configKey]
+	if ok {
+		delete(handlers, uniqueID)
+	}
+	// Stop when users is null
+	if len(handlers) == 0 {
+		Close.Do(func() {
+			// close listen goroutine
+			close(c.stop)
+		})
+		// close longpoll
+		c.acli.Stop()
+	}
 	return nil
+}
+
+// Read and execute callback functions for unique value binding
+func (c *client) onChange(namespace, cluster, key, data string) {
+	handlers := make([]callbackHandler, 0, 5)
+
+	c.handlerMutex.RLock()
+	configKey := configParamKey{
+		Key:       key,
+		NameSpace: namespace,
+		Cluster:   cluster,
+	}
+	for _, handler := range c.handlers[configKey] {
+		handlers = append(handlers, handler)
+	}
+	c.handlerMutex.RUnlock()
+	for _, handler := range handlers {
+		handler(namespace, cluster, key, data)
+	}
 }
 
 // RegisterConfigCallback register the callback function to apollo client.
 func (c *client) RegisterConfigCallback(param ConfigParam,
-	callback func(string, ConfigParser),
+	callback func(string, ConfigParser), uniqueID int64,
 ) {
 	onChange := func(namespace, cluster, key, data string) {
-		klog.Debugf("[apollo] config %s updated, namespace %s cluster %s key %s data %s",
-			namespace, namespace, cluster, key, data)
+		klog.Debugf("[apollo] uniqueID %d config %s updated, namespace %s cluster %s key %s data %s",
+			uniqueID, namespace, namespace, cluster, key, data)
 		callback(data, c.parser)
 	}
 
-	configMap := c.acli.GetNameSpace(param.NameSpace)
+	configMap := c.acli.GetNameSpace(param.nameSpace)
 	data, ok := configMap[param.Key]
 	if !ok {
-		klog.Info("key:", param.Key)
-		klog.Info("CONFIG:", configMap)
-		panic(errors.New("kitex config : key not found"))
+		klog.Warnf("[apollo] key not found | key :%s", param.Key)
+		klog.Warnf("[apollo] configMap: %v", configMap)
+	} else {
+		callback(data.(string), c.parser)
 	}
-	// data := c.acli.Get(param.Key, agollo.WithNamespace(param.NameSpace))
-	callback(data.(string), c.parser)
 
-	go c.listenConfig(param, onChange)
+	go c.listenConfig(param, c.stop, onChange, uniqueID)
 }
 
-func (c *client) listenConfig(param ConfigParam, callback func(namespace, cluster, key, data string)) {
-	errorsCh := c.acli.Start()
-	apolloRespCh := c.acli.WatchNamespace(param.NameSpace, make(chan bool))
+func (c *client) listenConfig(param ConfigParam, stop chan bool, callback func(namespace, cluster, key, data string), uniqueID int64) {
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Error("[apollo] listen goroutine error: %v, stack: %s", err, string(debug.Stack()))
+		}
+	}()
 
-	for {
-		select {
-		case resp := <-apolloRespCh:
-			data, ok := resp.NewValue[param.Key]
-			if !ok {
-				klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found",
-					param.NameSpace, param.NameSpace, param.Cluster, param.Key)
-				klog.Error("[apollo] please recover key remote config")
-				continue
+	configKey := getConfigParamKey(&param)
+	klog.Debugf("register key %v for uniqueID %d", configKey, uniqueID)
+	c.handlerMutex.Lock()
+	handlers, ok := c.handlers[configKey]
+	if !ok {
+		handlers = make(map[int64]callbackHandler)
+		c.handlers[configKey] = handlers
+	}
+	handlers[uniqueID] = callback
+	c.handlerMutex.Unlock()
+
+	if !ok {
+		errorsCh := c.acli.Start()
+		apolloRespCh := c.acli.WatchNamespace(param.nameSpace, stop)
+
+		for {
+			select {
+			case resp := <-apolloRespCh:
+				data, ok := resp.NewValue[param.Key]
+				if !ok {
+					// Deal with delete config
+					klog.Warnf("[apollo] config %s error, namespace %s cluster %s key %s : error : key not found | please recover key from remote config",
+						param.nameSpace, param.nameSpace, param.Cluster, param.Key)
+					c.onChange(param.nameSpace, param.Cluster, param.Key, emptyConfig)
+					continue
+				}
+				c.onChange(param.nameSpace, param.Cluster, param.Key, data.(string))
+			case err := <-errorsCh:
+				klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error %s",
+					param.nameSpace, param.nameSpace, param.Cluster, param.Key, err.Err.Error())
+				return
+			case <-stop:
+				klog.Warnf("[apollo] config %s exit,namespace %s cluster %s key %s : exit",
+					param.nameSpace, param.nameSpace, param.Cluster, param.Key)
+				return
 			}
-			klog.Info("[apollo] config update")
-			callback(param.NameSpace, param.Cluster, param.Key, data.(string))
-		case err := <-errorsCh:
-			klog.Errorf("[apollo] config %s error, namespace %s cluster %s key %s : error %s",
-				param.NameSpace, param.NameSpace, param.Cluster, param.Key, err.Err.Error())
-			return
 		}
 	}
 }

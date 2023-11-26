@@ -28,28 +28,34 @@ import (
 
 // WithCircuitBreaker sets the circuit breaker policy from apollo configuration center.
 func WithCircuitBreaker(dest, src string, apolloClient apollo.Client,
-	cfs ...apollo.CustomFunction,
+	opts utils.Options,
 ) []client.Option {
 	param, err := apolloClient.ClientConfigParam(&apollo.ConfigParamConfig{
 		Category:          apollo.CircuitBreakerConfigName,
 		ServerServiceName: dest,
 		ClientServiceName: src,
-	}, cfs...)
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	cbSuite := initCircuitBreaker(param, dest, src, apolloClient)
+	for _, f := range opts.ApolloCustomFunctions {
+		f(&param)
+	}
+
+	uniqueID := apollo.GetUniqueID()
+
+	cbSuite := initCircuitBreaker(param, dest, src, apolloClient, uniqueID)
 
 	return []client.Option{
 		client.WithCircuitBreaker(cbSuite),
 		client.WithCloseCallbacks(func() error {
-			err := cbSuite.Close()
+			err := apolloClient.DeregisterConfig(param, uniqueID)
 			if err != nil {
 				return err
 			}
 			// cancel the configuration listener when client is closed.
-			return apolloClient.DeregisterConfig(param)
+			return cbSuite.Close()
 		}),
 	}
 }
@@ -74,7 +80,7 @@ func genServiceCBKey(toService, method string) string {
 }
 
 func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
-	apolloClient apollo.Client,
+	apolloClient apollo.Client, uniqueID int64,
 ) *circuitbreak.CBSuite {
 	cb := circuitbreak.NewCBSuite(genServiceCBKeyWithRPCInfo)
 	lcb := utils.ThreadSafeSet{}
@@ -84,7 +90,7 @@ func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
 		configs := map[string]circuitbreak.CBConfig{}
 		err := parser.Decode(param.Type, data, &configs)
 		if err != nil {
-			klog.Warnf("[apollo] %s client apollo rpc timeout: unmarshal data %s failed: %s, skip...", dest, data, err)
+			klog.Warnf("[apollo] %s client apollo circuit breakr: unmarshal data %s failed: %s, skip...", dest, data, err)
 			return
 		}
 
@@ -101,7 +107,7 @@ func initCircuitBreaker(param apollo.ConfigParam, dest, src string,
 		}
 	}
 
-	apolloClient.RegisterConfigCallback(param, onChangeCallback)
+	apolloClient.RegisterConfigCallback(param, onChangeCallback, uniqueID)
 
 	return cb
 }
