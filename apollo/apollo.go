@@ -16,10 +16,10 @@ package apollo
 
 import (
 	"bytes"
+	"runtime/debug"
 	"sync"
 	"text/template"
 
-	"github.com/apolloconfig/agollo/v4/component/log"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/shima-park/agollo"
 )
@@ -87,7 +87,6 @@ type Options struct {
 	ServerKeyFormat string
 	ClientKeyFormat string
 	ApolloOptions   []agollo.Option
-	CustomLogger    log.LoggerInterface
 	ConfigParser    ConfigParser
 }
 
@@ -96,9 +95,6 @@ type OptionFunc func(option *Options)
 func NewClient(opts Options, optsfunc ...OptionFunc) (Client, error) {
 	if opts.ConfigServerURL == "" {
 		opts.ConfigServerURL = ApolloDefaultConfigServerURL
-	}
-	if opts.CustomLogger == nil {
-		opts.CustomLogger = NewCustomApolloLogger()
 	}
 	if opts.ConfigParser == nil {
 		opts.ConfigParser = defaultConfigParse()
@@ -207,11 +203,11 @@ func (c *client) configParam(cpc *ConfigParamConfig, t *template.Template) (Conf
 
 // DeregisterConfig deregister the config.
 func (c *client) DeregisterConfig(cfg ConfigParam, uniqueID int64) error {
-	configkey := getConfigParamKey(&cfg)
-	klog.Debugf("deregister key %v for uniqueID %d", configkey, uniqueID)
+	configKey := getConfigParamKey(&cfg)
+	klog.Debugf("deregister key %v for uniqueID %d", configKey, uniqueID)
 	c.handlerMutex.Lock()
 	defer c.handlerMutex.Unlock()
-	handlers, ok := c.handlers[configkey]
+	handlers, ok := c.handlers[configKey]
 	if ok {
 		delete(handlers, uniqueID)
 	}
@@ -232,12 +228,12 @@ func (c *client) onChange(namespace, cluster, key, data string) {
 	handlers := make([]callbackHandler, 0, 5)
 
 	c.handlerMutex.RLock()
-	configkey := configParamKey{
+	configKey := configParamKey{
 		Key:       key,
 		NameSpace: namespace,
 		Cluster:   cluster,
 	}
-	for _, handler := range c.handlers[configkey] {
+	for _, handler := range c.handlers[configKey] {
 		handlers = append(handlers, handler)
 	}
 	c.handlerMutex.RUnlock()
@@ -271,7 +267,7 @@ func (c *client) RegisterConfigCallback(param ConfigParam,
 func (c *client) listenConfig(param ConfigParam, stop chan bool, callback func(namespace, cluster, key, data string), uniqueID int64) {
 	defer func() {
 		if err := recover(); err != nil {
-			klog.Error("[apollo] listen goroutine error:", err)
+			klog.Error("[apollo] listen goroutine error: %v, stack: %s", err, string(debug.Stack()))
 		}
 	}()
 
