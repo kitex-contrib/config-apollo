@@ -68,7 +68,8 @@ func (fa *fakeApollo) change(cfg configParamKey, data string) {
 	fa.Lock()
 	defer fa.Unlock()
 	klog.Infof("change data : %s", data)
-	for idx := 0; idx < fa.len; idx++ {
+
+	if fa.len != 0 {
 		fa.resp <- &agollo.ApolloResponse{
 			NewValue: agollo.Configurations{cfg.Key: data},
 		}
@@ -146,7 +147,7 @@ func TestRegisterAndDeregister(t *testing.T) {
 	}()
 	wg.Wait()
 	// wait the goroutine init
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	// first change
 	fake.change(configParamKey{
 		Key:       "k1",
@@ -155,8 +156,9 @@ func TestRegisterAndDeregister(t *testing.T) {
 	}, "first change")
 
 	// wait goroutine deal
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
+	gotlock.Lock()
 	assert.Equal(t, map[configParamKey]map[int64]string{
 		{
 			Key:       "k1",
@@ -167,7 +169,7 @@ func TestRegisterAndDeregister(t *testing.T) {
 			id2: "first change",
 		},
 	}, gots)
-
+	gotlock.Unlock()
 	cli.DeregisterConfig(ConfigParam{
 		Key:       "k1",
 		nameSpace: "n1",
@@ -185,7 +187,7 @@ func TestRegisterAndDeregister(t *testing.T) {
 	}, "second change")
 
 	// wait goroutine deal
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	cli.DeregisterConfig(ConfigParam{
 		Key:       "k1",
@@ -197,6 +199,7 @@ func TestRegisterAndDeregister(t *testing.T) {
 	fake.len--
 	fake.Unlock()
 
+	gotlock.Lock()
 	assert.Equal(t, map[configParamKey]map[int64]string{
 		{
 			Key:       "k1",
@@ -207,13 +210,18 @@ func TestRegisterAndDeregister(t *testing.T) {
 			id2: "first change",
 		},
 	}, gots)
+	gotlock.Unlock()
 
 	fake.change(configParamKey{
 		Key:       "k1",
 		NameSpace: "n1",
 		Cluster:   "c1",
 	}, "third change")
-	time.Sleep(2 * time.Second)
+
+	// wait goroutine deal
+	time.Sleep(1 * time.Second)
+
+	gotlock.Lock()
 	assert.Equal(t, map[configParamKey]map[int64]string{
 		{
 			Key:       "k1",
@@ -224,4 +232,5 @@ func TestRegisterAndDeregister(t *testing.T) {
 			id2: "first change",
 		},
 	}, gots)
+	gotlock.Unlock()
 }
